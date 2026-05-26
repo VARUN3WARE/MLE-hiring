@@ -40,6 +40,12 @@ python code/validate_submission.py
 
 Use `--skip-determinism` only for quick iteration; run the full check before submitting.
 
+Safety firewall sample checks:
+
+```bash
+python code/test_safety_firewall.py
+```
+
 ## Layout
 
 | Module | Role |
@@ -48,6 +54,8 @@ Use `--skip-determinism` only for quick iteration; run the full check before sub
 | `issue_parser.py` | Safe JSON parsing of `issue` conversations |
 | `baseline.py` | Placeholder output fields per row |
 | `pii.py` | Lightweight deterministic PII heuristics |
+| `safety/` | Safety firewall (adversarial + PII classification, redaction) |
+| `test_safety_firewall.py` | Synthetic + corpus coverage checks for firewall |
 | `paths.py` | Repo paths and output column order |
 | `validate_output.py` | Structural output validation |
 

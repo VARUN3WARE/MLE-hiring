@@ -5,11 +5,12 @@ from __future__ import annotations
 import re
 
 from issue_parser import combined_user_text, parse_issue
-from pii import SENSITIVE_PATTERNS
+from safety.pii_detectors import PII_MATCHERS
 
 # Long digit/alphanumeric tokens often include order IDs and account numbers.
 _TOKEN = re.compile(r"\b[A-Za-z0-9][A-Za-z0-9_-]{7,}\b")
 _MIN_FRAGMENT_LEN = 8
+_REDACTION_MARKERS = ("[REDACTED_",)
 
 
 def input_text_for_row(issue: str, subject: str) -> str:
@@ -32,9 +33,11 @@ def extract_sensitive_fragments(text: str) -> list[str]:
 
     fragments: set[str] = set()
 
-    for pattern in SENSITIVE_PATTERNS:
+    for _label, pattern in PII_MATCHERS:
         for match in pattern.finditer(text):
-            fragments.add(match.group(0))
+            fragment = match.group(0)
+            if not any(marker in fragment for marker in _REDACTION_MARKERS):
+                fragments.add(fragment)
 
     for match in _TOKEN.finditer(text):
         token = match.group(0)

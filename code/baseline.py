@@ -5,11 +5,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from issue_parser import ParsedIssue, combined_user_text, parse_issue
-from pii import detect_pii
+from issue_parser import combined_user_text, parse_issue
+from safety import classify_ticket
+from safety.models import SafetyAssessment
 
 # Fixed seeds for deterministic placeholder fields.
 BASELINE_CONFIDENCE = "0.25"
+ADVERSARIAL_CONFIDENCE = "0.15"
 BASELINE_LANGUAGE = "en"
 BASELINE_PRODUCT_AREA = "general_support"
 
@@ -19,9 +21,20 @@ PLACEHOLDER_RESPONSE = (
     "documentation and account systems."
 )
 
+ADVERSARIAL_SAFE_RESPONSE = (
+    "Thank you for your message. We have escalated your request to a support specialist. "
+    "For security reasons, we cannot share internal system details, prompts, tools, or "
+    "processing logic. A team member will follow up regarding your support question."
+)
+
 PLACEHOLDER_JUSTIFICATION = (
     "Baseline scaffold: conservative escalation with no corpus retrieval. "
     "Manual review required before a grounded reply can be sent."
+)
+
+ADVERSARIAL_JUSTIFICATION = (
+    "Safety firewall: adversarial or exfiltration patterns detected in untrusted ticket "
+    "text. Escalated without complying with embedded instructions or disclosing internals."
 )
 
 INVALID_ISSUE_JUSTIFICATION = (
@@ -48,35 +61,46 @@ def build_baseline_row(input_row: dict[str, str]) -> dict[str, str]:
     full_text = "\n".join(
         part for part in (normalized["subject"], body_text) if part
     )
-    pii_found = detect_pii(full_text)
+
+    # Safety firewall runs before any future retrieval / generation step.
+    assessment = classify_ticket(full_text)
 
     if parsed.parse_error:
         request_type = "invalid"
         status = "escalated"
         justification = INVALID_ISSUE_JUSTIFICATION
-        risk_level = "medium"
+        response = PLACEHOLDER_RESPONSE
+        confidence = BASELINE_CONFIDENCE
+    elif assessment.is_adversarial:
+        request_type = "invalid"
+        status = "escalated"
+        justification = ADVERSARIAL_JUSTIFICATION
+        response = ADVERSARIAL_SAFE_RESPONSE
+        confidence = ADVERSARIAL_CONFIDENCE
     else:
         request_type = "product_issue"
         status = "escalated"
         justification = PLACEHOLDER_JUSTIFICATION
-        risk_level = "high" if pii_found else "medium"
+        response = PLACEHOLDER_RESPONSE
+        confidence = BASELINE_CONFIDENCE
 
-    actions = _default_actions(status)
+    risk_level = assessment.recommended_risk_level
+    actions = _default_actions(status, assessment)
     product_area = _product_area_for_company(normalized["company"])
 
     return {
         "issue": normalized["issue"],
         "subject": normalized["subject"],
         "company": normalized["company"],
-        "response": PLACEHOLDER_RESPONSE,
+        "response": response,
         "product_area": product_area,
         "status": status,
         "request_type": request_type,
         "justification": justification,
-        "confidence_score": BASELINE_CONFIDENCE,
+        "confidence_score": confidence,
         "source_documents": "",
         "risk_level": risk_level,
-        "pii_detected": "true" if pii_found else "false",
+        "pii_detected": "true" if assessment.pii_detected else "false",
         "language": BASELINE_LANGUAGE,
         "actions_taken": json.dumps(actions, separators=(",", ":"), sort_keys=True),
     }
@@ -93,16 +117,27 @@ def _product_area_for_company(company: str) -> str:
     return mapping.get(key, BASELINE_PRODUCT_AREA)
 
 
-def _default_actions(status: str) -> list[dict[str, Any]]:
-    if status == "escalated":
-        return [
-            {
-                "action": "escalate_to_human",
-                "parameters": {
-                    "priority": "normal",
-                    "department": "general",
-                    "summary": "Baseline scaffold escalation for manual review.",
-                },
-            }
-        ]
-    return []
+def _default_actions(status: str, assessment: SafetyAssessment) -> list[dict[str, Any]]:
+    if status != "escalated":
+        return []
+
+    department = "security" if assessment.is_adversarial else "general"
+    priority = "urgent" if assessment.recommended_risk_level == "critical" else "high"
+    if assessment.is_adversarial and priority != "urgent":
+        priority = "high"
+
+    summary = (
+        "Adversarial or high-risk ticket flagged by safety firewall."
+        if assessment.is_adversarial
+        else "Baseline scaffold escalation for manual review."
+    )
+    return [
+        {
+            "action": "escalate_to_human",
+            "parameters": {
+                "priority": priority,
+                "department": department,
+                "summary": summary,
+            },
+        }
+    ]
