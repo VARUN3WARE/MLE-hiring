@@ -46,6 +46,13 @@ Safety firewall sample checks:
 python code/test_safety_firewall.py
 ```
 
+Corpus index stats:
+
+```bash
+python code/print_corpus_stats.py
+python code/test_corpus_index.py
+```
+
 ## Layout
 
 | Module | Role |
@@ -56,6 +63,9 @@ python code/test_safety_firewall.py
 | `pii.py` | Lightweight deterministic PII heuristics |
 | `safety/` | Safety firewall (adversarial + PII classification, redaction) |
 | `test_safety_firewall.py` | Synthetic + corpus coverage checks for firewall |
+| `retrieval/` | Deterministic corpus indexer (`build_index`, `search`) |
+| `print_corpus_stats.py` | Index stats + path existence verification |
+| `test_corpus_index.py` | Indexer unit-like checks |
 | `paths.py` | Repo paths and output column order |
 | `validate_output.py` | Structural output validation |
 
