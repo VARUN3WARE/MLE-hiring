@@ -26,9 +26,19 @@ python code/main.py --input support_tickets/support_tickets.csv --output support
 
 ## Validate
 
+Official structural check (provided by the challenge):
+
 ```bash
 python code/validate_output.py
 ```
+
+Extended local harness (tool schemas, corpus paths, PII echo, determinism):
+
+```bash
+python code/validate_submission.py
+```
+
+Use `--skip-determinism` only for quick iteration; run the full check before submitting.
 
 ## Layout
 
