@@ -1,0 +1,2 @@
+# Baseline scaffold uses only the Python standard library.
+# Add pinned dependencies here as the agent grows (e.g. openai, anthropic).

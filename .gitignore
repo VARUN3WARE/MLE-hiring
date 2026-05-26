@@ -19,7 +19,7 @@ env/
 # OS
 .DS_Store
 Thumbs.db
-
+submission/
 # Build artifacts
 dist/
 build/
