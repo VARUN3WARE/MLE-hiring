@@ -6,6 +6,7 @@ import json
 from typing import Any
 
 from issue_parser import combined_user_text, parse_issue
+from retrieval.evidence import retrieve_evidence, source_document_paths
 from safety import classify_ticket
 from safety.models import SafetyAssessment
 
@@ -88,6 +89,16 @@ def build_baseline_row(input_row: dict[str, str]) -> dict[str, str]:
     actions = _default_actions(status, assessment)
     product_area = _product_area_for_company(normalized["company"])
 
+    source_documents = ""
+    if not parsed.parse_error and not assessment.is_adversarial:
+        retrieval = retrieve_evidence(
+            issue=normalized["issue"],
+            subject=normalized["subject"],
+            company=normalized["company"],
+        )
+        if retrieval.overall_grade in ("strong", "weak"):
+            source_documents = source_document_paths(retrieval)
+
     return {
         "issue": normalized["issue"],
         "subject": normalized["subject"],
@@ -98,7 +109,7 @@ def build_baseline_row(input_row: dict[str, str]) -> dict[str, str]:
         "request_type": request_type,
         "justification": justification,
         "confidence_score": confidence,
-        "source_documents": "",
+        "source_documents": source_documents,
         "risk_level": risk_level,
         "pii_detected": "true" if assessment.pii_detected else "false",
         "language": BASELINE_LANGUAGE,

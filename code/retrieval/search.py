@@ -1,58 +1,14 @@
-"""Deterministic lexical search over the corpus index."""
+"""Deterministic BM25 search over the corpus index (backward-compatible API)."""
 
 from __future__ import annotations
 
-import math
-import re
-from collections import Counter
-
+from retrieval.bm25 import BM25Index
+from retrieval.evidence import retrieve_evidence
 from retrieval.indexer import build_index
 from retrieval.models import CorpusChunk, CorpusIndex, SearchHit
-
-_TOKEN = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
-
-_STOPWORDS = frozenset(
-    {
-        "a",
-        "an",
-        "and",
-        "are",
-        "as",
-        "at",
-        "be",
-        "by",
-        "for",
-        "from",
-        "how",
-        "i",
-        "in",
-        "is",
-        "it",
-        "my",
-        "of",
-        "on",
-        "or",
-        "the",
-        "to",
-        "was",
-        "what",
-        "when",
-        "where",
-        "who",
-        "with",
-        "your",
-    }
-)
-
-
-def _tokenize(text: str) -> list[str]:
-    tokens = [t for t in _TOKEN.findall(text.lower()) if t not in _STOPWORDS and len(t) > 1]
-    return tokens
-
-
-def _chunk_text(chunk: CorpusChunk) -> str:
-    heading_text = " ".join(chunk.headings)
-    return f"{chunk.title}\n{heading_text}\n{chunk.body}"
+from retrieval.query import build_retrieval_query
+from retrieval.ranking import domain_boost, path_penalty, specificity_boost
+from retrieval.tokenize import tokenize
 
 
 def _matches_filters(chunk: CorpusChunk, filters: dict[str, object] | None) -> bool:
@@ -84,44 +40,38 @@ def search(
     top_k: int = 8,
 ) -> list[SearchHit]:
     """
-  Rank chunks by deterministic lexical overlap (no embeddings, no network).
+    Rank chunks with BM25 plus deterministic boosts/penalties.
 
-  ``filters`` supports: ``domain``, ``domains`` (list), ``path_prefix``.
-  """
+    ``filters`` supports: ``domain``, ``domains`` (list), ``path_prefix``.
+    """
     if not query.strip():
         return []
 
     corpus = index or build_index()
-    query_terms = _tokenize(query)
-    if not query_terms:
-        return []
+    bm25_index = BM25Index.from_corpus(corpus)
+    retrieval_query = build_retrieval_query(issue=query, subject="", company="")
+    if filters and filters.get("domain"):
+        retrieval_query = build_retrieval_query(
+            issue=query,
+            subject="",
+            company=str(filters["domain"]),
+        )
 
-    query_counts = Counter(query_terms)
+    query_terms = list(retrieval_query.tokens) or tokenize(query)
     hits: list[tuple[float, str, str, CorpusChunk]] = []
 
-    for chunk in corpus.chunks:
+    for idx, chunk in enumerate(corpus.chunks):
         if not _matches_filters(chunk, filters):
             continue
-
-        title_tokens = _tokenize(chunk.title)
-        heading_tokens = _tokenize(" ".join(chunk.headings))
-        body_tokens = _tokenize(chunk.body)
-
-        score = 0.0
-        for tokens, field_weight in (
-            (title_tokens, 3.0),
-            (heading_tokens, 2.0),
-            (body_tokens, 1.0),
-        ):
-            counts = Counter(tokens)
-            for token, tf in counts.items():
-                if token in query_counts:
-                    # BM25-ish saturation without corpus statistics for determinism.
-                    score += field_weight * (1.0 + math.log1p(tf))
-
-        if score <= 0:
+        raw = bm25_index.score_chunk(query_terms, idx)
+        if raw <= 0:
             continue
-
+        score = (
+            raw
+            * path_penalty(chunk.path)
+            * domain_boost(chunk, retrieval_query)
+            * specificity_boost(chunk)
+        )
         hits.append((score, chunk.path, chunk.chunk_id, chunk))
 
     hits.sort(key=lambda item: (-item[0], item[1], item[2]))
@@ -129,3 +79,21 @@ def search(
         SearchHit(chunk=chunk, score=round(score, 6), rank=rank + 1)
         for rank, (score, _path, _cid, chunk) in enumerate(hits[:top_k])
     ]
+
+
+def search_ticket(
+    *,
+    issue: str,
+    subject: str = "",
+    company: str = "",
+    index: CorpusIndex | None = None,
+    top_k: int = 5,
+):
+    """Preferred API: full ticket context with evidence grading."""
+    return retrieve_evidence(
+        issue=issue,
+        subject=subject,
+        company=company,
+        index=index,
+        top_k=top_k,
+    )
