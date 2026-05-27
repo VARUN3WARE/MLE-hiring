@@ -69,6 +69,7 @@ python code/test_routing.py
 | `test_retrieval_manual.py` | Visible-ticket retrieval smoke tests |
 | `routing.py` | Deterministic routing + tool planning |
 | `test_routing.py` | Routing/tool-planning smoke tests |
+| `response.py` | Response composition + confidence calibration |
 | `print_corpus_stats.py` | Index stats + path existence verification |
 | `test_corpus_index.py` | Indexer unit-like checks |
 | `paths.py` | Repo paths and output column order |

@@ -15,6 +15,7 @@ from typing import Any
 
 from issue_parser import combined_user_text, parse_issue
 from retrieval.evidence import RetrievalResult, retrieve_evidence, source_document_paths
+from response import compose_escalation, compose_reply
 from safety import classify_ticket
 from safety.models import SafetyAssessment
 
@@ -88,17 +89,16 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
         source_documents = source_document_paths(retrieval)
 
     if _should_reply(assessment, retrieval, tool_plan):
-        response = _build_reply(retrieval, assessment)
-        justification = _build_reply_justification(retrieval)
+        composed = compose_reply(retrieval=retrieval, assessment=assessment)
         return RouteDecision(
             status="replied",
             request_type=request_type,
             risk_level=assessment.recommended_risk_level if assessment.recommended_risk_level in VALID_RISK_LEVEL else "low",
             product_area=product_area,
-            response=response,
-            justification=justification,
-            confidence_score=_confidence_for_reply(retrieval),
-            source_documents=source_documents,
+            response=composed.response,
+            justification=composed.justification,
+            confidence_score=composed.confidence_score,
+            source_documents=composed.source_documents,
             actions=tool_plan,
             assessment=assessment,
         )
@@ -202,14 +202,13 @@ def _route_escalate(
         req_type = "invalid"
 
     risk = assessment.recommended_risk_level if assessment.recommended_risk_level in VALID_RISK_LEVEL else "medium"
-    confidence = "0.2" if req_type == "invalid" else "0.25"
-
-    response = (
-        "Thank you for contacting support. Your request has been escalated to a support specialist. "
-        "For safety and privacy reasons, we may need additional verification before taking account-level actions."
+    composed = compose_escalation(
+        assessment=assessment,
+        reason=reason,
+        retrieval=retrieval,
+        has_tool_actions=True,
+        missing_prereqs=False,
     )
-
-    justification = f"Routed to escalation. {reason}"
     actions = [
         {
             "action": "escalate_to_human",
@@ -221,10 +220,10 @@ def _route_escalate(
         request_type=req_type,
         risk_level=risk,
         product_area=prod_area,
-        response=response,
-        justification=justification,
-        confidence_score=confidence,
-        source_documents=source_documents,
+        response=composed.response,
+        justification=composed.justification,
+        confidence_score=composed.confidence_score,
+        source_documents=composed.source_documents or source_documents,
         actions=actions,
         assessment=assessment,
     )
@@ -313,38 +312,9 @@ def _should_reply(assessment: SafetyAssessment, retrieval: RetrievalResult, tool
     return True
 
 
-def _build_reply(retrieval: RetrievalResult, assessment: SafetyAssessment) -> str:
-    # Use only citation-safe content (snippets from corpus) and never echo input PII.
-    if not retrieval.items:
-        return (
-            "Thanks for reaching out. I’m not seeing enough information to answer confidently from the provided documentation. "
-            "I’ve escalated this to a support specialist."
-        )
-
-    top = retrieval.items[0]
-    sources = source_document_paths(retrieval)
-    snippet = top.snippet
-    if sources:
-        return (
-            f"Based on the support documentation, here’s the most relevant guidance:\n\n"
-            f"{snippet}\n\n"
-            f"Sources: {sources}"
-        )
-    return f"Based on the support documentation:\n\n{snippet}"
-
-
-def _build_reply_justification(retrieval: RetrievalResult) -> str:
-    if retrieval.notes:
-        return "Reply grounded in top corpus evidence. " + " ".join(retrieval.notes)
-    return "Reply grounded in top corpus evidence."
-
-
-def _confidence_for_reply(retrieval: RetrievalResult) -> str:
-    if retrieval.overall_grade == "strong":
-        return "0.7"
-    if retrieval.overall_grade == "weak":
-        return "0.45"
-    return "0.25"
+#
+# Reply composition and confidence calibration now live in code/response.py
+#
 
 
 def _first_match(pattern: re.Pattern[str], text: str) -> str:
