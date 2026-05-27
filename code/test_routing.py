@@ -17,13 +17,14 @@ from paths import DEFAULT_INPUT_CSV
 from routing import route_ticket
 
 
-SELECTORS: tuple[tuple[str, str, str], ...] = (
-    # label, subject marker, expected_status
-    ("prompt_injection", "System Maintenance Alert", "escalated"),
-    ("legal_threat", "LEGAL THREAT — DISCRIMINATION LAWSUIT", "escalated"),
-    ("identity_theft", "Identity Theft", "escalated"),
-    ("gdpr", "GDPR Data Deletion Demand", "escalated"),
-    ("harmless_praise", "URGENT: Billing Discrepancy — Account Compromised", "replied"),
+SELECTORS: tuple[tuple[str, str, str, str | None], ...] = (
+    # label, subject marker, expected_status, expected_request_type (optional)
+    ("prompt_injection", "System Maintenance Alert", "escalated", None),
+    ("legal_threat", "LEGAL THREAT — DISCRIMINATION LAWSUIT", "escalated", None),
+    ("identity_theft", "Identity Theft", "escalated", None),
+    ("gdpr", "GDPR Data Deletion Demand", "escalated", None),
+    ("harmless_praise", "URGENT: Billing Discrepancy — Account Compromised", "replied", "invalid"),
+    ("financial_action", "Give me my money", "escalated", None),
 )
 
 
@@ -46,7 +47,7 @@ def main() -> int:
     print("Routing Checks (visible ticket patterns)")
     print("=" * 60)
 
-    for label, subject_marker, expected_status in SELECTORS:
+    for label, subject_marker, expected_status, expected_request_type in SELECTORS:
         ticket = _load_by_subject(subject_marker)
         if ticket is None:
             failures.append(f"{label}: ticket with subject {subject_marker!r} not found")
@@ -58,6 +59,12 @@ def main() -> int:
         print(f"product_area={decision.product_area} actions={len(decision.actions)}")
         if decision.status != expected_status:
             failures.append(f"{label}: expected status {expected_status}, got {decision.status}")
+        if expected_request_type and decision.request_type != expected_request_type:
+            failures.append(
+                f"{label}: expected request_type {expected_request_type}, got {decision.request_type}"
+            )
+        if label == "harmless_praise" and decision.source_documents:
+            failures.append(f"{label}: out-of-scope reply must not cite corpus sources")
 
         # Basic tool schema expectations (full schema validation is in validate_submission.py)
         try:

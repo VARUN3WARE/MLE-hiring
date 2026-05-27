@@ -13,6 +13,7 @@ from retrieval.indexer import build_index, verify_index_paths
 from retrieval.models import CorpusChunk, CorpusIndex
 from retrieval.query import RetrievalQuery, build_retrieval_query
 from retrieval.ranking import domain_boost, path_penalty, specificity_boost
+from ticket_categories import is_hub_path
 from retrieval.tokenize import tokenize
 
 EvidenceGrade = str  # strong | weak | conflicting | insufficient
@@ -200,14 +201,23 @@ def retrieve_evidence(
     )
 
 
-def source_document_paths(result: RetrievalResult) -> str:
+def source_document_paths(result: RetrievalResult, *, exclude_hubs: bool = False) -> str:
     """Pipe-separated unique paths for output CSV (existing files only)."""
-    paths: list[str] = []
     seen: set[str] = set()
+    articles: list[str] = []
+    hubs: list[str] = []
+
     for item in result.items:
         if item.path in seen:
             continue
-        if (REPO_ROOT / item.path).is_file():
-            seen.add(item.path)
-            paths.append(item.path)
-    return "|".join(paths)
+        if not (REPO_ROOT / item.path).is_file():
+            continue
+        seen.add(item.path)
+        if is_hub_path(item.path):
+            hubs.append(item.path)
+        else:
+            articles.append(item.path)
+
+    if exclude_hubs and articles:
+        return "|".join(articles)
+    return "|".join(articles + hubs)

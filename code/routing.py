@@ -14,8 +14,13 @@ from dataclasses import dataclass
 from typing import Any
 
 from issue_parser import combined_user_text, parse_issue
-from retrieval.evidence import RetrievalResult, retrieve_evidence, source_document_paths
-from response import compose_escalation, compose_reply
+from retrieval.evidence import RetrievalResult, retrieve_evidence
+from response import compose_escalation, compose_out_of_scope, compose_reply
+from ticket_categories import (
+    is_harmless_out_of_scope,
+    is_hub_path,
+    requires_account_action_escalation,
+)
 from safety import classify_ticket
 from safety.models import SafetyAssessment
 
@@ -76,17 +81,44 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             force_invalid=True,
         )
 
-    request_type = _infer_request_type("\n".join(p for p in (subject, body) if p))
-    product_area = _infer_product_area("\n".join(p for p in (subject, body) if p), company)
+    ticket_text = "\n".join(p for p in (subject, body) if p)
+    request_type = _infer_request_type(ticket_text)
+    product_area = _infer_product_area(ticket_text, company)
+
+    if is_harmless_out_of_scope(ticket_text):
+        composed = compose_out_of_scope(assessment=assessment)
+        return RouteDecision(
+            status="replied",
+            request_type="invalid",
+            risk_level="low",
+            product_area=product_area,
+            response=composed.response,
+            justification=composed.justification,
+            confidence_score=composed.confidence_score,
+            source_documents="",
+            actions=[],
+            assessment=assessment,
+        )
 
     # Tool planning for non-destructive account flows (reset password) only when safe and parameters exist.
-    tool_plan = plan_tools(text="\n".join(p for p in (subject, body) if p), assessment=assessment)
+    tool_plan = plan_tools(text=ticket_text, assessment=assessment)
 
     # Evidence retrieval (citation-safe). If insufficient, route conservative escalation.
     retrieval = retrieve_evidence(issue=issue, subject=subject, company=company)
-    source_documents = ""
-    if retrieval.overall_grade in ("strong", "weak"):
-        source_documents = source_document_paths(retrieval)
+
+    if requires_account_action_escalation(ticket_text):
+        return _route_escalate(
+            subject=subject,
+            company=company,
+            assessment=assessment,
+            reason="Account-level or billing action requested; escalating for verification and specialist review.",
+            department="billing",
+            priority="high",
+            request_type=request_type,
+            product_area=product_area,
+            retrieval=retrieval,
+            missing_prereqs=bool(tool_plan),
+        )
 
     if _should_reply(assessment, retrieval, tool_plan):
         composed = compose_reply(retrieval=retrieval, assessment=assessment)
@@ -112,7 +144,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
         priority="normal",
         request_type=request_type,
         product_area=product_area,
-        source_documents=source_documents,
+        retrieval=retrieval,
     )
 
 
@@ -187,6 +219,7 @@ def _route_escalate(
     product_area: str | None = None,
     source_documents: str = "",
     retrieval: RetrievalResult | None = None,
+    missing_prereqs: bool = False,
 ) -> RouteDecision:
     if force_invalid:
         req_type = "invalid"
@@ -207,7 +240,7 @@ def _route_escalate(
         reason=reason,
         retrieval=retrieval,
         has_tool_actions=True,
-        missing_prereqs=False,
+        missing_prereqs=missing_prereqs,
     )
     actions = [
         {
@@ -309,6 +342,16 @@ def _should_reply(assessment: SafetyAssessment, retrieval: RetrievalResult, tool
     # If we planned any tools, keep conservative (avoid accidental actions).
     if tool_plan:
         return False
+    non_hub_items = [item for item in retrieval.items if not is_hub_path(item.path)]
+    if not non_hub_items:
+        return False
+
+    if retrieval.items and is_hub_path(retrieval.items[0].path):
+        # Top hit is a broad hub page — only reply if a specific article is clearly better.
+        if len(retrieval.items) < 2 or is_hub_path(retrieval.items[1].path):
+            return False
+        if retrieval.items[0].score - retrieval.items[1].score < 3.0:
+            return False
     return True
 
 

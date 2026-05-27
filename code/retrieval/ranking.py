@@ -7,7 +7,7 @@ from pathlib import Path
 from retrieval.models import CorpusChunk
 from retrieval.query import RetrievalQuery
 
-_INDEX_PAGE_NAMES = frozenset({"index.md"})
+_INDEX_PAGE_NAMES = frozenset({"index.md", "support.md"})
 _LOW_QUALITY_SEGMENTS = (
     "deprecated",
     "deprecation",

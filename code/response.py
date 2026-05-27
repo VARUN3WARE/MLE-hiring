@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from retrieval.evidence import RetrievalResult, source_document_paths
 from safety.models import SafetyAssessment
+from ticket_categories import is_hub_path
 
 
 @dataclass(frozen=True)
@@ -23,17 +24,40 @@ class ComposedResponse:
     source_documents: str
 
 
+def compose_out_of_scope(*, assessment: SafetyAssessment) -> ComposedResponse:
+    """Polite clarification for harmless out-of-scope messages (no corpus citations)."""
+    response = (
+        "Thanks for your message. This looks outside the scope of product support I can help with here. "
+        "If you have a specific account, billing, or product question, please share details and I can "
+        "point you to the right support resources."
+    )
+    return ComposedResponse(
+        response=response,
+        justification="Harmless out-of-scope request; replied with clarification and no corpus citations.",
+        confidence_score=_fmt_conf(0.35),
+        source_documents="",
+    )
+
+
 def compose_reply(*, retrieval: RetrievalResult, assessment: SafetyAssessment) -> ComposedResponse:
     """
     Compose a concise, grounded reply from retrieval snippets.
 
     Assumes caller already ensured: not adversarial, not high risk, no PII echo risk.
     """
-    sources = source_document_paths(retrieval) if retrieval.overall_grade in ("strong", "weak") else ""
+    sources = (
+        source_document_paths(retrieval, exclude_hubs=True)
+        if retrieval.overall_grade in ("strong", "weak")
+        else ""
+    )
     snippet_lines: list[str] = []
-    for item in retrieval.items[:2]:
+    for item in retrieval.items:
+        if is_hub_path(item.path):
+            continue
         if item.snippet:
             snippet_lines.append(f"- {item.snippet}")
+        if len(snippet_lines) >= 2:
+            break
 
     if snippet_lines:
         body = "Here’s what the support documentation says:\n\n" + "\n".join(snippet_lines)

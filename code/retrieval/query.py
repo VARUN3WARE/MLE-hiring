@@ -25,6 +25,8 @@ _INTENT_EXPANSIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("privacy", ("privacy", "gdpr", "data", "deletion", "erase", "export")),
     ("travel", ("travel", "card", "blocked", "merchant", "visa", "transaction")),
     ("support", ("support", "help", "contact", "escalate")),
+    # Multilingual cue words (generic, not ticket-specific).
+    ("multilingual", ("tarjeta", "bloqueada", "remboursement", "fraude", "reembolso", "bloqueo")),
 )
 
 _TEXT_DOMAIN_HINTS: tuple[tuple[str, str], ...] = (
