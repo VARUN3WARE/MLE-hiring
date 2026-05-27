@@ -143,7 +143,7 @@ _RISK_TOPIC_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         re.IGNORECASE,
     )),
     ("risk:identity_theft", re.compile(
-        r"\bidentity\s+(?:theft|stolen)|stolen\s+identity\b",
+        r"\b(?:identity\s+(?:theft|stolen)|stolen\s+identity|identity\s+has\s+been\s+stolen)\b",
         re.IGNORECASE,
     )),
     ("risk:account_compromise", re.compile(

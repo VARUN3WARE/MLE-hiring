@@ -52,6 +52,7 @@ Corpus index stats:
 python code/print_corpus_stats.py
 python code/test_corpus_index.py
 python code/test_retrieval_manual.py
+python code/test_routing.py
 ```
 
 ## Layout
@@ -66,6 +67,8 @@ python code/test_retrieval_manual.py
 | `test_safety_firewall.py` | Synthetic + corpus coverage checks for firewall |
 | `retrieval/` | Corpus indexer, BM25 retrieval, evidence grading |
 | `test_retrieval_manual.py` | Visible-ticket retrieval smoke tests |
+| `routing.py` | Deterministic routing + tool planning |
+| `test_routing.py` | Routing/tool-planning smoke tests |
 | `print_corpus_stats.py` | Index stats + path existence verification |
 | `test_corpus_index.py` | Indexer unit-like checks |
 | `paths.py` | Repo paths and output column order |
