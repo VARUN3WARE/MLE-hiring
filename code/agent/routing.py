@@ -13,10 +13,10 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from issue_parser import combined_user_text, parse_issue
+from agent.issue_parser import combined_user_text, parse_issue
 from retrieval.evidence import RetrievalResult, retrieve_evidence
-from response import compose_escalation, compose_out_of_scope, compose_reply
-from ticket_categories import (
+from agent.response import compose_escalation, compose_out_of_scope, compose_reply
+from schemas.ticket_categories import (
     is_harmless_out_of_scope,
     is_hub_path,
     requires_account_action_escalation,

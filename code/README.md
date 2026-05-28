@@ -1,6 +1,14 @@
-# Support Triage Agent — Baseline Scaffold
+# Support Triage Agent (Deterministic + Optional Gated LLM)
 
-Deterministic, stdlib-only baseline that reads `support_tickets/support_tickets.csv` and writes `support_tickets/output.csv` with conservative placeholder decisions. No network calls and no ticket-specific hardcoded answers.
+This submission is **deterministic by default** (no network calls) and produces `support_tickets/output.csv` from `support_tickets/support_tickets.csv`.
+
+It includes:
+
+- Safety firewall (prompt-injection + PII detection + redaction)
+- BM25 retrieval + evidence grading over the provided `data/` corpus
+- Deterministic routing + tool planning
+- Deterministic response composition grounded in approved snippets
+- Optional gated LLM polisher that rewrites wording only and always falls back safely
 
 ## Setup
 
@@ -18,6 +26,21 @@ pip install -r code/requirements.txt
 python code/main.py
 ```
 
+### Optional LLM polisher (off by default)
+
+Copy `.env.example` to `.env`, set `OPENAI_API_KEY`, then:
+
+```bash
+USE_LLM_POLISHER=true python code/main.py
+```
+
+Notes:
+
+- With `USE_LLM_POLISHER=false` (default), output is fully deterministic and performs **no network calls**.
+- No LLM call is made for ineligible rows (eligibility gate is conservative).
+- The LLM can only replace the **`response` text**. All routing/decision fields remain deterministic.
+- If the API key is missing, the API fails, times out, or validation fails, we **immediately fall back** to the deterministic response.
+
 Optional paths:
 
 ```bash
@@ -29,13 +52,13 @@ python code/main.py --input support_tickets/support_tickets.csv --output support
 Official structural check (provided by the challenge):
 
 ```bash
-python code/validate_output.py
+python code/scripts/validate_output.py
 ```
 
 Extended local harness (tool schemas, corpus paths, PII echo, determinism):
 
 ```bash
-python code/validate_submission.py
+python code/scripts/validate_submission.py
 ```
 
 Use `--skip-determinism` only for quick iteration; run the full check before submitting.
@@ -43,16 +66,24 @@ Use `--skip-determinism` only for quick iteration; run the full check before sub
 Safety firewall sample checks:
 
 ```bash
-python code/test_safety_firewall.py
+python code/tests/test_safety_firewall.py
+```
+
+LLM layer unit tests (no network required):
+
+```bash
+python code/tests/test_llm_packet.py
+python code/tests/test_llm_polisher.py
 ```
 
 Corpus index stats:
 
 ```bash
-python code/print_corpus_stats.py
-python code/test_corpus_index.py
-python code/test_retrieval_manual.py
-python code/test_routing.py
+python code/scripts/print_corpus_stats.py
+python code/tests/test_corpus_index.py
+python code/tests/test_retrieval_manual.py
+python code/tests/test_routing.py
+python code/tests/test_llm_eligibility.py
 ```
 
 ## Layout
@@ -74,11 +105,15 @@ python code/test_routing.py
 | `test_corpus_index.py` | Indexer unit-like checks |
 | `paths.py` | Repo paths and output column order |
 | `validate_output.py` | Structural output validation |
+| `llm/` | Eligibility gate, polish packets, optional OpenAI polisher |
 
-## Current behavior (scaffold only)
+## Reproducibility checklist
 
-- Copies `issue`, `subject`, and `company` from input unchanged.
-- Escalates all structurally valid tickets with low confidence (`0.25`).
-- Uses `escalate_to_human` in `actions_taken` for escalated rows.
-- Marks unparseable `issue` values as `request_type=invalid` without crashing.
-- Does not retrieve from `data/` yet — `source_documents` is empty.
+- Deterministic run: `USE_LLM_POLISHER=false python code/main.py`
+- Output path: `support_tickets/output.csv`
+- Validate structure: `python code/scripts/validate_output.py`
+- Validate submission locally: `python code/scripts/validate_submission.py`
+
+## Architecture
+
+See `code/ARCHITECTURE.md` for the system diagram, module responsibilities, and self-assessment.

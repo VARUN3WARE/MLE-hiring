@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from issue_parser import combined_user_text, parse_issue
+from agent.issue_parser import combined_user_text, parse_issue
 from retrieval.tokenize import tokenize
 
 _COMPANY_TO_DOMAIN = {

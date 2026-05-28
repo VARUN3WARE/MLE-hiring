@@ -11,9 +11,12 @@ import csv
 import sys
 from pathlib import Path
 
-from issue_parser import combined_user_text, parse_issue
-from paths import DEFAULT_INPUT_CSV, REPO_ROOT
-from safety import classify_ticket
+# Allow running as `python code/tests/test_*.py` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from agent.issue_parser import combined_user_text, parse_issue  # noqa: E402
+from paths import DEFAULT_INPUT_CSV  # noqa: E402
+from safety import classify_ticket  # noqa: E402
 
 # Synthetic probes — pattern classes only, not copied from any specific ticket answer.
 SYNTHETIC_CASES: tuple[tuple[str, str, bool, bool], ...] = (
@@ -172,3 +175,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

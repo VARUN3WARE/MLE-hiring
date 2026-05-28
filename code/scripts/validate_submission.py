@@ -17,9 +17,12 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# Allow running as `python code/scripts/validate_submission.py` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from paths import DEFAULT_INPUT_CSV, DEFAULT_OUTPUT_CSV, OUTPUT_COLUMNS, REPO_ROOT
-from pii_leak import find_pii_leaks, input_text_for_row
-from tool_schema import load_tool_specs, validate_actions
+from safety.pii_leak import find_pii_leaks, input_text_for_row
+from schemas.tool_schema import load_tool_specs, validate_actions
 
 VALID_STATUS = {"replied", "escalated"}
 VALID_REQUEST_TYPE = {"product_issue", "feature_request", "bug", "invalid"}

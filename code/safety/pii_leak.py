@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import re
 
-from issue_parser import combined_user_text, parse_issue
+from agent.issue_parser import combined_user_text, parse_issue
 from safety.pii_detectors import PII_MATCHERS
 
 # Long digit/alphanumeric tokens often include order IDs and account numbers.

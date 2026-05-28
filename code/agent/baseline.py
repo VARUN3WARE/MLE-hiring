@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 
-from issue_parser import combined_user_text, parse_issue
-from routing import route_ticket
+from agent.issue_parser import combined_user_text, parse_issue
+from agent.routing import route_ticket
+from llm.polisher import maybe_polish_response
 
 # Fixed seeds for deterministic placeholder fields.
 BASELINE_CONFIDENCE = "0.25"
@@ -60,11 +61,19 @@ def build_baseline_row(input_row: dict[str, str]) -> dict[str, str]:
         company=normalized["company"],
     )
 
+    response = maybe_polish_response(
+        issue=normalized["issue"],
+        subject=normalized["subject"],
+        company=normalized["company"],
+        decision=decision,
+        deterministic_response=decision.response,
+    )
+
     return {
         "issue": normalized["issue"],
         "subject": normalized["subject"],
         "company": normalized["company"],
-        "response": decision.response,
+        "response": response,
         "product_area": decision.product_area,
         "status": decision.status,
         "request_type": decision.request_type,
