@@ -16,20 +16,26 @@ The required entry point is `code/main.py`.
 
 ```mermaid
 flowchart TD
-  A[CSV row: issue/subject/company] --> B[Parse issue JSON]
-  B --> C[Safety firewall: classify + redact]
-  C --> D[BM25 retrieval over data/]
-  D --> E[Evidence grading]
-  E --> F[Deterministic routing + tool planning]
-  F --> G[Deterministic response draft + citations]
-  G --> H{Eligible + USE_LLM_POLISHER?}
-  H -->|No| I[Use deterministic response]
-  H -->|Yes| J[Build redacted polish packet]
-  J --> K[OpenAI JSON response (temp=0, short timeout)]
-  K --> L{Validate JSON + sources + flags}
+  A["CSV row: issue/subject/company"] --> B["Parse issue JSON"]
+  B --> C["Safety firewall: classify + redact"]
+  C --> D["BM25 retrieval over data/"]
+  D --> E["Evidence grading"]
+  E --> F["Deterministic routing + tool planning"]
+  F --> G["Deterministic response draft + citations"]
+
+  G --> H{"Eligible AND USE_LLM_POLISHER?"}
+
+  H -->|No| I["Use deterministic response"]
+  H -->|Yes| J["Build redacted polish packet"]
+
+  J --> K["OpenAI JSON response<br/>(temp=0, short timeout)"]
+
+  K --> L{"Validate JSON, sources, and flags"}
+
   L -->|Fail| I
-  L -->|Pass| M[Use LLM-polished response text only]
-  I --> N[Write output.csv]
+  L -->|Pass| M["Use LLM-polished response text only"]
+
+  I --> N["Write output.csv"]
   M --> N
 ```
 
