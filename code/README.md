@@ -43,16 +43,17 @@ Use `--skip-determinism` only for quick iteration; run the full check before sub
 Safety firewall sample checks:
 
 ```bash
-python code/test_safety_firewall.py
+python code/tests/test_safety_firewall.py
 ```
 
 Corpus index stats:
 
 ```bash
 python code/print_corpus_stats.py
-python code/test_corpus_index.py
-python code/test_retrieval_manual.py
-python code/test_routing.py
+python code/tests/test_corpus_index.py
+python code/tests/test_retrieval_manual.py
+python code/tests/test_routing.py
+python code/tests/test_llm_eligibility.py
 ```
 
 ## Layout

@@ -11,10 +11,13 @@ import sys
 from collections import Counter
 from pathlib import Path
 
-from issue_parser import combined_user_text, parse_issue
-from llm.eligibility import LLMRowContext, is_llm_eligible
-from retrieval.evidence import retrieve_evidence
-from routing import route_ticket
+# Allow running as `python code/tests/test_*.py` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from issue_parser import combined_user_text, parse_issue  # noqa: E402
+from llm.eligibility import LLMRowContext, is_llm_eligible  # noqa: E402
+from retrieval.evidence import retrieve_evidence  # noqa: E402
+from routing import route_ticket  # noqa: E402
 
 
 CSV_PATH = Path("support_tickets/support_tickets.csv")
@@ -40,7 +43,6 @@ def _normalize(row: dict[str, str]) -> dict[str, str]:
 
 
 def main() -> int:
-    rows = []
     with CSV_PATH.open(newline="", encoding="utf-8") as handle:
         rows = [_normalize(r) for r in csv.DictReader(handle)]
 
@@ -57,7 +59,9 @@ def main() -> int:
         ticket_text = "\n".join(p for p in (row["subject"], body) if p)
 
         decision = route_ticket(**row)
-        retrieval = retrieve_evidence(issue=row["issue"], subject=row["subject"], company=row["company"])
+        retrieval = retrieve_evidence(
+            issue=row["issue"], subject=row["subject"], company=row["company"]
+        )
         ctx = LLMRowContext(decision=decision, retrieval=retrieval, ticket_text=ticket_text)
         eligible, reasons = is_llm_eligible(ctx)
         eligible_total += int(eligible)
@@ -79,14 +83,16 @@ def main() -> int:
         body = combined_user_text(parsed)
         ticket_text = "\n".join(p for p in (row["subject"], body) if p)
         decision = route_ticket(**row)
-        retrieval = retrieve_evidence(issue=row["issue"], subject=row["subject"], company=row["company"])
+        retrieval = retrieve_evidence(
+            issue=row["issue"], subject=row["subject"], company=row["company"]
+        )
         ctx = LLMRowContext(decision=decision, retrieval=retrieval, ticket_text=ticket_text)
         eligible, reasons = is_llm_eligible(ctx)
-        print(f"\n- subject={row['subject']!r} company={row['company']!r} status={decision.status} eligible={eligible}")
-        if reasons:
-            print(f"  reasons={reasons}")
-        else:
-            print("  reasons=[]")
+        print(
+            f"\n- subject={row['subject']!r} company={row['company']!r} "
+            f"status={decision.status} eligible={eligible}"
+        )
+        print(f"  reasons={reasons}")
 
     return 0
 

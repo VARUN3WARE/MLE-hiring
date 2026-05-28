@@ -12,8 +12,11 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from paths import DEFAULT_INPUT_CSV, REPO_ROOT
-from retrieval import build_index, retrieve_evidence, verify_index_paths
+# Allow running as `python code/tests/test_*.py` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from paths import DEFAULT_INPUT_CSV, REPO_ROOT  # noqa: E402
+from retrieval import build_index, retrieve_evidence, verify_index_paths  # noqa: E402
 
 # Select tickets by stable subject/content markers, not row indices.
 TICKET_SELECTORS: tuple[
@@ -77,9 +80,7 @@ def main() -> int:
         print(f"company={ticket['company']!r} grade={result.overall_grade}")
         print(f"text_domains={result.query.text_domain_scores}")
         if expected_grade and result.overall_grade != expected_grade:
-            failures.append(
-                f"{label}: expected grade {expected_grade}, got {result.overall_grade}"
-            )
+            failures.append(f"{label}: expected grade {expected_grade}, got {result.overall_grade}")
         if not result.items:
             print("  (no evidence items)")
             continue
@@ -107,3 +108,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

@@ -4,10 +4,14 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 
-from paths import REPO_ROOT
-from retrieval import build_index, search
-from retrieval.indexer import verify_index_paths
+# Allow running as `python code/tests/test_*.py` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from paths import REPO_ROOT  # noqa: E402
+from retrieval import build_index, search  # noqa: E402
+from retrieval.indexer import verify_index_paths  # noqa: E402
 
 
 def main() -> int:
@@ -58,3 +62,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
