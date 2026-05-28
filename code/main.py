@@ -3,7 +3,7 @@
 Deterministic baseline scaffold for the MLE Hiring Challenge.
 
 Reads support_tickets/support_tickets.csv and writes support_tickets/output.csv
-with structurally valid placeholder decisions (no LLM, no network).
+with structurally valid decisions. Optional LLM polishing is env-gated (see .env.example).
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ import sys
 from pathlib import Path
 
 from agent.baseline import build_baseline_row
+from llm.config import load_llm_config
+from llm.polisher import get_polish_stats, reset_polish_stats
 from paths import DEFAULT_INPUT_CSV, DEFAULT_OUTPUT_CSV, OUTPUT_COLUMNS
 
 
@@ -74,6 +76,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
 
+    reset_polish_stats()
+    llm_cfg = load_llm_config()
+
     try:
         rows_read, rows_written = process_tickets(args.input, args.output)
     except (FileNotFoundError, ValueError) as exc:
@@ -81,6 +86,15 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     print(f"Processed {rows_read} ticket(s); wrote {rows_written} row(s) to {args.output}")
+    stats = get_polish_stats()
+    if llm_cfg.enabled:
+        print(
+            f"LLM polisher: enabled (model={llm_cfg.model}); "
+            f"attempted={stats.attempted} applied={stats.applied} "
+            f"ineligible_skips={stats.skipped_ineligible}"
+        )
+    elif stats.skipped_disabled:
+        pass  # polisher off — no extra line
     if rows_read != rows_written:
         print("Warning: read count and write count differ", file=sys.stderr)
         return 1
