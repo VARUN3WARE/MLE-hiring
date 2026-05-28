@@ -8,12 +8,15 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from issue_parser import combined_user_text, parse_issue
+# Allow running as `python code/scripts/analyze_output.py` from repo root.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from agent.issue_parser import combined_user_text, parse_issue
 from paths import DEFAULT_INPUT_CSV, DEFAULT_OUTPUT_CSV
 from retrieval.evidence import retrieve_evidence
-from routing import route_ticket
+from agent.routing import route_ticket
 from safety import classify_ticket
-from ticket_categories import (
+from schemas.ticket_categories import (
     is_harmless_out_of_scope,
     is_hub_path,
     is_multilingual,

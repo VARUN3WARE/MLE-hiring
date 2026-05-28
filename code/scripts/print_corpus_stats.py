@@ -6,6 +6,10 @@ from __future__ import annotations
 import sys
 from collections import Counter
 
+# Allow running as `python code/scripts/print_corpus_stats.py` from repo root.
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 from retrieval import build_index, search
 from retrieval.indexer import verify_index_paths
 

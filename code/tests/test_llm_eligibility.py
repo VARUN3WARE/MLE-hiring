@@ -14,10 +14,10 @@ from pathlib import Path
 # Allow running as `python code/tests/test_*.py` from repo root.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from issue_parser import combined_user_text, parse_issue  # noqa: E402
+from agent.issue_parser import combined_user_text, parse_issue  # noqa: E402
 from llm.eligibility import LLMRowContext, is_llm_eligible  # noqa: E402
 from retrieval.evidence import retrieve_evidence  # noqa: E402
-from routing import route_ticket  # noqa: E402
+from agent.routing import route_ticket  # noqa: E402
 
 
 CSV_PATH = Path("support_tickets/support_tickets.csv")

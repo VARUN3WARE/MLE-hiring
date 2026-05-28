@@ -17,7 +17,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from paths import DEFAULT_INPUT_CSV  # noqa: E402
-from routing import route_ticket  # noqa: E402
+from agent.routing import route_ticket  # noqa: E402
 
 
 SELECTORS: tuple[tuple[str, str, str, str | None], ...] = (

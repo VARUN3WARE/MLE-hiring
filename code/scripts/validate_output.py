@@ -13,6 +13,10 @@ import csv
 import sys
 import os
 
+# Allow running as `python code/scripts/validate_output.py` from repo root.
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
 EXPECTED_HEADERS = [
     "issue", "subject", "company", "response", "product_area",
     "status", "request_type", "justification", "confidence_score",
@@ -26,19 +30,20 @@ VALID_RISK_LEVEL = {"low", "medium", "high", "critical"}
 VALID_PII_DETECTED = {"true", "false"}
 
 def validate():
-    output_path = os.path.join(os.path.dirname(__file__), "..", "support_tickets", "output.csv")
-    input_path = os.path.join(os.path.dirname(__file__), "..", "support_tickets", "support_tickets.csv")
+    repo_root = Path(__file__).resolve().parents[2]
+    output_path = repo_root / "support_tickets" / "output.csv"
+    input_path = repo_root / "support_tickets" / "support_tickets.csv"
     
-    if not os.path.exists(output_path):
+    if not output_path.exists():
         print("❌ FAIL: output.csv not found at", output_path)
         return False
     
-    if not os.path.exists(input_path):
+    if not input_path.exists():
         print("❌ FAIL: support_tickets.csv not found at", input_path)
         return False
     
     # Count input rows
-    with open(input_path, "r", encoding="utf-8") as f:
+    with input_path.open("r", encoding="utf-8") as f:
         input_reader = csv.reader(f)
         next(input_reader)  # skip header
         input_count = sum(1 for _ in input_reader)
@@ -47,7 +52,7 @@ def validate():
     errors = []
     warnings = []
     
-    with open(output_path, "r", encoding="utf-8") as f:
+    with output_path.open("r", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         
         # Check headers

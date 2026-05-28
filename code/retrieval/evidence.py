@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from issue_parser import combined_user_text, parse_issue
+from agent.issue_parser import combined_user_text, parse_issue
 from paths import REPO_ROOT
 from safety import classify_ticket
 from retrieval.bm25 import BM25Index
@@ -13,7 +13,7 @@ from retrieval.indexer import build_index, verify_index_paths
 from retrieval.models import CorpusChunk, CorpusIndex
 from retrieval.query import RetrievalQuery, build_retrieval_query
 from retrieval.ranking import domain_boost, path_penalty, specificity_boost
-from ticket_categories import is_hub_path
+from schemas.ticket_categories import is_hub_path
 from retrieval.tokenize import tokenize
 
 EvidenceGrade = str  # strong | weak | conflicting | insufficient

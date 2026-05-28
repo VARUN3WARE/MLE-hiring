@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 
-from issue_parser import combined_user_text, parse_issue
-from routing import route_ticket
+from agent.issue_parser import combined_user_text, parse_issue
+from agent.routing import route_ticket
 
 # Fixed seeds for deterministic placeholder fields.
 BASELINE_CONFIDENCE = "0.25"

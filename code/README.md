@@ -29,13 +29,13 @@ python code/main.py --input support_tickets/support_tickets.csv --output support
 Official structural check (provided by the challenge):
 
 ```bash
-python code/validate_output.py
+python code/scripts/validate_output.py
 ```
 
 Extended local harness (tool schemas, corpus paths, PII echo, determinism):
 
 ```bash
-python code/validate_submission.py
+python code/scripts/validate_submission.py
 ```
 
 Use `--skip-determinism` only for quick iteration; run the full check before submitting.
@@ -49,7 +49,7 @@ python code/tests/test_safety_firewall.py
 Corpus index stats:
 
 ```bash
-python code/print_corpus_stats.py
+python code/scripts/print_corpus_stats.py
 python code/tests/test_corpus_index.py
 python code/tests/test_retrieval_manual.py
 python code/tests/test_routing.py

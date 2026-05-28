@@ -13,7 +13,7 @@ import csv
 import sys
 from pathlib import Path
 
-from baseline import build_baseline_row
+from agent.baseline import build_baseline_row
 from paths import DEFAULT_INPUT_CSV, DEFAULT_OUTPUT_CSV, OUTPUT_COLUMNS
 
 

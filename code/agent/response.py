@@ -13,7 +13,7 @@ from dataclasses import dataclass
 
 from retrieval.evidence import RetrievalResult, source_document_paths
 from safety.models import SafetyAssessment
-from ticket_categories import is_hub_path
+from schemas.ticket_categories import is_hub_path
 
 
 @dataclass(frozen=True)

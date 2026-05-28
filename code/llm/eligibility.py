@@ -15,8 +15,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from retrieval.evidence import RetrievalResult
-from routing import RouteDecision
-from ticket_categories import is_multilingual, requires_account_action_escalation
+from agent.routing import RouteDecision
+from schemas.ticket_categories import is_multilingual, requires_account_action_escalation
 
 
 @dataclass(frozen=True)
