@@ -12,24 +12,35 @@ It includes:
 
 ## Setup
 
-From the repository root:
+From the repository root (one level above `code/`):
 
+**Step 1 — Create and activate a virtual environment:**
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
+```
+
+**Step 2 — Install dependencies:**
+```bash
 pip install -r code/requirements.txt
 ```
 
+**Step 3 — Configure environment variables:**
+```bash
+cp .env.example .env
+# Open .env and paste your OPENAI_API_KEY if you want the optional LLM polisher
+```
+
+The `.env` file must be placed at the **repository root** (next to the `code/` folder), not inside `code/`. The agent discovers it automatically via `code/paths.py`.
+
 ## Run
 
+**Deterministic mode (default, no network calls, fully reproducible):**
 ```bash
 python code/main.py
 ```
 
-### Optional LLM polisher (off by default)
-
-Copy `.env.example` to `.env`, set `OPENAI_API_KEY`, then:
-
+**With optional LLM polisher enabled:**
 ```bash
 USE_LLM_POLISHER=true python code/main.py
 ```
@@ -41,11 +52,35 @@ Notes:
 - The LLM can only replace the **`response` text**. All routing/decision fields remain deterministic.
 - If the API key is missing, the API fails, times out, or validation fails, we **immediately fall back** to the deterministic response.
 
-Optional paths:
-
+Optional custom paths:
 ```bash
 python code/main.py --input support_tickets/support_tickets.csv --output support_tickets/output.csv
 ```
+
+## Interactive Mode (Live Red-Teaming)
+
+For testing individual tickets interactively (e.g., during a live interview or demo), use the `--interactive` flag:
+
+```bash
+USE_LLM_POLISHER=false python code/main.py --interactive
+```
+
+At the prompt, paste either a valid JSON conversation array or raw plain text. The agent wraps plain text automatically:
+
+```
+Issue — paste JSON array or plain text, then press Enter on an empty line:
+Someone hacked my account, lock it now!
+
+(Wrapped plain text as a single user message.)
+========================================================================
+AGENT DECISION
+========================================================================
+  Status:          escalated
+  Risk level:      high
+  ...
+```
+
+Press `n` to exit the loop.
 
 ## Synthetic hidden-set fixtures (local testing)
 
@@ -142,6 +177,18 @@ python code/tests/test_llm_eligibility.py
 - Output path: `support_tickets/output.csv`
 - Validate structure: `python code/scripts/validate_output.py`
 - Validate submission locally: `python code/scripts/validate_submission.py`
+- SHA-256 of identical back-to-back runs must match (confirmed during final rehearsal).
+
+## Submission packaging
+
+To reproduce the exact submitted ZIP from the repository root:
+
+```bash
+git log --oneline --all > git_history.txt
+zip -r submission.zip code/ git_history.txt .env.example
+```
+
+Upload `submission.zip` and `support_tickets/output.csv` separately on the submission form.
 
 ## Architecture
 
