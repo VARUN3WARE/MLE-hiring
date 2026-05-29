@@ -22,7 +22,8 @@ from paths import DEFAULT_INPUT_CSV, DEFAULT_OUTPUT_CSV, OUTPUT_COLUMNS
 
 _INTERACTIVE_BANNER = """
 Interactive mode — run one ticket at a time (live red-teaming).
-Commands: blank line after issue JSON to finish paste; 'quit' or 'exit' to leave.
+Paste a JSON issue array or plain ticket text; end with a blank line.
+Commands: 'quit' or 'exit' to leave.
 """.strip()
 
 
@@ -67,9 +68,34 @@ def process_tickets(input_path: Path, output_path: Path) -> tuple[int, int]:
     return rows_read, rows_written
 
 
+def _coerce_interactive_issue(raw_text: str) -> str:
+    """
+    Normalize interactive paste into the issue JSON string the batch pipeline expects.
+
+    Valid JSON conversation arrays pass through (re-serialized). Plain text is wrapped as
+    a single user turn. Only used by the interactive REPL.
+    """
+    text = (raw_text or "").strip()
+    if not text:
+        return json.dumps([{"role": "user", "content": ""}], ensure_ascii=False)
+
+    try:
+        parsed = json.loads(text)
+    except json.JSONDecodeError:
+        return json.dumps([{"role": "user", "content": text}], ensure_ascii=False)
+
+    if isinstance(parsed, list):
+        return json.dumps(parsed, ensure_ascii=False)
+    if isinstance(parsed, dict) and "content" in parsed:
+        return json.dumps([parsed], ensure_ascii=False)
+    if isinstance(parsed, str):
+        return json.dumps([{"role": "user", "content": parsed}], ensure_ascii=False)
+    return json.dumps([{"role": "user", "content": text}], ensure_ascii=False)
+
+
 def _read_multiline_issue() -> str | None:
-    """Read issue JSON from stdin until a blank line (or EOF after content)."""
-    print("Issue JSON — paste below, then press Enter on an empty line:")
+    """Read issue text from stdin until a blank line (or EOF after content)."""
+    print("Issue — paste JSON array or plain text, then press Enter on an empty line:")
     lines: list[str] = []
     while True:
         try:
@@ -159,11 +185,15 @@ def run_interactive(*, llm_enabled: bool) -> int:
             print("No issue text provided; try again or type quit.")
             continue
 
+        issue_json = _coerce_interactive_issue(issue)
+        if issue_json != issue.strip():
+            print("(Wrapped plain text as a single user message.)")
+
         subject = input("Subject (optional, Enter to skip): ").strip()
         company = input("Company (optional, Enter to skip): ").strip()
 
         input_row = {
-            "issue": issue,
+            "issue": issue_json,
             "subject": subject,
             "company": company,
         }
