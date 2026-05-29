@@ -63,6 +63,14 @@ _SUSPICIOUS_MARKUP = re.compile(
     r"<\s*(?:script|iframe|object|embed)|onclick\s*=|javascript\s*:",
     re.IGNORECASE,
 )
+_HALLUCINATED_CITATION_REQUEST = re.compile(
+    r"nonexistent\s+policy|cite\s+nonexistent|policy\.doc\b",
+    re.IGNORECASE,
+)
+_CONTRADICTORY_ESCALATION = re.compile(
+    r"escalat(?:e|ion).{0,120}actually\s+no,\s+just\s+reply",
+    re.IGNORECASE | re.DOTALL,
+)
 _SYNTHETIC_OR_FAKE_TERMS = re.compile(
     r"\b(?:SYNTH[-_][A-Z0-9-]+|ERROR_CODE_[A-Z0-9_]+|flarnium|hyperbolic\s+interview|"
     r"legacy\s+portal|backwards-compatible\s+widget)\b",
@@ -173,6 +181,23 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
     # Evidence retrieval (citation-safe). If insufficient, route conservative escalation.
     retrieval = retrieve_evidence(issue=issue, subject=subject, company=company)
 
+    if _HALLUCINATED_CITATION_REQUEST.search(body_text or ticket_text):
+        return _route_escalate(
+            subject=subject,
+            company=company,
+            assessment=assessment,
+            reason=(
+                "User requested citation of a nonexistent or unverifiable policy; "
+                "escalating without fabricated sources."
+            ),
+            department="general",
+            priority="normal",
+            request_type=request_type,
+            product_area=product_area,
+            retrieval=retrieval,
+            force_invalid=True,
+        )
+
     if requires_account_action_escalation(body_text):
         return _route_escalate(
             subject=subject,
@@ -202,6 +227,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             product_area=product_area,
             retrieval=retrieval,
             missing_prereqs=bool(tool_plan),
+            force_invalid=_content_escalation_force_invalid(escalation_reason),
         )
 
     if _is_safe_pii_informational_reply(ticket_text, assessment, retrieval, tool_plan):
@@ -337,7 +363,8 @@ def _route_escalate(
     composed = compose_escalation(
         assessment=assessment,
         reason=reason,
-        retrieval=None,
+        retrieval=retrieval,
+        request_type=req_type,
         has_tool_actions=True,
         missing_prereqs=missing_prereqs,
     )
@@ -355,7 +382,7 @@ def _route_escalate(
         response=composed.response,
         justification=composed.justification,
         confidence_score=composed.confidence_score,
-        source_documents="",
+        source_documents=composed.source_documents,
         actions=actions,
         assessment=assessment,
     )
@@ -378,6 +405,15 @@ def _content_escalation_reason(
 
     if _SUSPICIOUS_MARKUP.search(scan_text):
         return "Suspicious markup or script-like content detected; escalating for manual review."
+
+    if _HALLUCINATED_CITATION_REQUEST.search(body or ""):
+        return (
+            "User requested citation of a nonexistent or unverifiable policy; "
+            "escalating without fabricated sources."
+        )
+
+    if _CONTRADICTORY_ESCALATION.search(body or ""):
+        return "Contradictory escalation instructions detected; escalating for manual review."
 
     if _is_repetitive_or_noisy(scan_text):
         return "Noisy or repetitive ticket content; escalating for manual review."
@@ -448,6 +484,19 @@ def _content_escalation_reason(
         return "Identity verification required before account action; escalating for specialist handling."
 
     return None
+
+
+def _content_escalation_force_invalid(reason: str) -> bool:
+    """Strip citations / mark invalid for content-driven escalations that must not cite."""
+    markers = (
+        "Suspicious markup",
+        "Malformed",
+        "Noisy or repetitive",
+        "nonexistent or unverifiable",
+        "Contradictory escalation",
+        "not supported by retrieved evidence",
+    )
+    return any(marker in reason for marker in markers)
 
 
 def _has_verified_identity(ticket_text: str, tool_plan: list[dict[str, Any]]) -> bool:

@@ -86,15 +86,28 @@ def compose_reply(*, retrieval: RetrievalResult, assessment: SafetyAssessment) -
     )
 
 
+def _escalation_sources_allowed(
+    *,
+    assessment: SafetyAssessment,
+    request_type: str,
+) -> bool:
+    """Strip citations only for adversarial or invalid/out-of-scope rows."""
+    if assessment.is_adversarial:
+        return False
+    if (request_type or "").strip().lower() == "invalid":
+        return False
+    return True
+
+
 def compose_escalation(
     *,
     assessment: SafetyAssessment,
     reason: str,
     retrieval: RetrievalResult | None = None,
+    request_type: str = "product_issue",
     has_tool_actions: bool = True,
     missing_prereqs: bool = False,
 ) -> ComposedResponse:
-    # Escalations never cite corpus documents — keeps attribution policy strict.
     response = (
         "Thank you for reaching out. I’m escalating this to a support specialist for review. "
         "For safety and privacy reasons, we may need additional verification before taking any account-level actions."
@@ -108,6 +121,29 @@ def compose_escalation(
     if assessment.pii_detected:
         response += " Please avoid sharing sensitive personal information in chat. If verification is needed, support will guide you securely."
 
+    sources = ""
+    if (
+        _escalation_sources_allowed(assessment=assessment, request_type=request_type)
+        and retrieval is not None
+        and retrieval.overall_grade in ("strong", "conflicting")
+    ):
+        sources = source_document_paths(retrieval, exclude_hubs=True)
+        if sources:
+            snippet_lines: list[str] = []
+            for item in retrieval.items:
+                if is_hub_path(item.path):
+                    continue
+                if item.snippet:
+                    snippet_lines.append(f"- {item.snippet}")
+                if len(snippet_lines) >= 2:
+                    break
+            if snippet_lines:
+                response += (
+                    "\n\nRelevant support documentation while we review:\n\n"
+                    + "\n".join(snippet_lines)
+                )
+            response += f"\n\nSources: {sources}"
+
     justification = f"Escalated. {reason}".strip()
     confidence = calibrate_confidence(
         status="escalated",
@@ -120,7 +156,7 @@ def compose_escalation(
         response=response,
         justification=justification,
         confidence_score=_fmt_conf(confidence),
-        source_documents="",
+        source_documents=sources,
     )
 
 

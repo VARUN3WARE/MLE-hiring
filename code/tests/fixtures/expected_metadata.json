@@ -99,7 +99,7 @@
       "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Conflicting evidence — conservative escalation/low confidence.",
+      "notes": "Conflicting evidence \u2014 conservative escalation/low confidence.",
       "tags": []
     },
     {
@@ -114,7 +114,7 @@
       "citation_policy": "required",
       "llm_allowed": true,
       "human_review_required": false,
-      "notes": "Strong-evidence FAQ — eligible for LLM polish if other gates pass.",
+      "notes": "Strong-evidence FAQ \u2014 eligible for LLM polish if other gates pass.",
       "tags": []
     },
     {
@@ -207,7 +207,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "Synthetic PII only; response must not echo literals.",
@@ -260,7 +260,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Harmless out-of-scope — clarify scope, no citations.",
+      "notes": "Harmless out-of-scope \u2014 clarify scope, no citations.",
       "tags": []
     },
     {
@@ -275,7 +275,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -366,7 +366,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "Must verify before destructive refund.",
@@ -384,7 +384,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Harmless out-of-scope — clarify scope, no citations.",
+      "notes": "Harmless out-of-scope \u2014 clarify scope, no citations.",
       "tags": []
     },
     {
@@ -415,7 +415,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -494,7 +494,7 @@
       "expected_action_names": [
         "lock_account"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -512,7 +512,7 @@
       "citation_policy": "required",
       "llm_allowed": true,
       "human_review_required": false,
-      "notes": "Strong-evidence FAQ — eligible for LLM polish if other gates pass.",
+      "notes": "Strong-evidence FAQ \u2014 eligible for LLM polish if other gates pass.",
       "tags": []
     },
     {
@@ -563,7 +563,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -597,7 +597,7 @@
       "citation_policy": "required",
       "llm_allowed": true,
       "human_review_required": false,
-      "notes": "Strong-evidence FAQ — eligible for LLM polish if other gates pass.",
+      "notes": "Strong-evidence FAQ \u2014 eligible for LLM polish if other gates pass.",
       "tags": []
     },
     {
@@ -627,7 +627,7 @@
       "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Conflicting evidence — conservative escalation/low confidence.",
+      "notes": "Conflicting evidence \u2014 conservative escalation/low confidence.",
       "tags": []
     },
     {
@@ -641,7 +641,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "Must verify before destructive refund.",
@@ -673,7 +673,7 @@
       "expected_action_names": [
         "lock_account"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -720,7 +720,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "Must verify before destructive refund.",
@@ -752,7 +752,7 @@
       "expected_action_names": [
         "escalate_to_human"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -770,7 +770,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Likely insufficient evidence — escalate or low confidence.",
+      "notes": "Likely insufficient evidence \u2014 escalate or low confidence.",
       "tags": []
     },
     {
@@ -801,7 +801,7 @@
       "expected_action_names": [
         "escalate_to_human"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -850,7 +850,7 @@
       "expected_action_names": [
         "escalate_to_human"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -963,7 +963,7 @@
       "citation_policy": "required",
       "llm_allowed": true,
       "human_review_required": false,
-      "notes": "Strong-evidence FAQ — eligible for LLM polish if other gates pass.",
+      "notes": "Strong-evidence FAQ \u2014 eligible for LLM polish if other gates pass.",
       "tags": []
     },
     {
@@ -1124,7 +1124,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -1141,7 +1141,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "Must verify before destructive refund.",
@@ -1208,7 +1208,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -1238,7 +1238,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": true,
-      "notes": "Spanish legal threat — escalate.",
+      "notes": "Spanish legal threat \u2014 escalate.",
       "tags": [
         "escalation_tool",
         "multilingual"
@@ -1271,7 +1271,7 @@
       "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Conflicting evidence — conservative escalation/low confidence.",
+      "notes": "Conflicting evidence \u2014 conservative escalation/low confidence.",
       "tags": []
     },
     {
@@ -1382,7 +1382,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Harmless out-of-scope — clarify scope, no citations.",
+      "notes": "Harmless out-of-scope \u2014 clarify scope, no citations.",
       "tags": []
     },
     {
@@ -1480,7 +1480,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Harmless out-of-scope — clarify scope, no citations.",
+      "notes": "Harmless out-of-scope \u2014 clarify scope, no citations.",
       "tags": []
     },
     {
@@ -1578,7 +1578,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -1627,7 +1627,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Likely insufficient evidence — escalate or low confidence.",
+      "notes": "Likely insufficient evidence \u2014 escalate or low confidence.",
       "tags": []
     },
     {
@@ -1657,7 +1657,7 @@
       "citation_policy": "required",
       "llm_allowed": true,
       "human_review_required": false,
-      "notes": "Strong-evidence FAQ — eligible for LLM polish if other gates pass.",
+      "notes": "Strong-evidence FAQ \u2014 eligible for LLM polish if other gates pass.",
       "tags": []
     },
     {
@@ -1672,7 +1672,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Likely insufficient evidence — escalate or low confidence.",
+      "notes": "Likely insufficient evidence \u2014 escalate or low confidence.",
       "tags": []
     },
     {
@@ -1736,7 +1736,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -1782,7 +1782,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -1849,7 +1849,7 @@
       "citation_policy": "required",
       "llm_allowed": true,
       "human_review_required": false,
-      "notes": "Strong-evidence FAQ — eligible for LLM polish if other gates pass.",
+      "notes": "Strong-evidence FAQ \u2014 eligible for LLM polish if other gates pass.",
       "tags": []
     },
     {
@@ -2013,7 +2013,7 @@
       "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Conflicting evidence — conservative escalation/low confidence.",
+      "notes": "Conflicting evidence \u2014 conservative escalation/low confidence.",
       "tags": []
     },
     {
@@ -2042,7 +2042,7 @@
       "expected_action_names": [
         "lock_account"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -2124,7 +2124,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Likely insufficient evidence — escalate or low confidence.",
+      "notes": "Likely insufficient evidence \u2014 escalate or low confidence.",
       "tags": []
     },
     {
@@ -2139,7 +2139,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -2154,7 +2154,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -2252,7 +2252,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -2296,7 +2296,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -2328,7 +2328,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "Must verify before destructive refund.",
@@ -2346,7 +2346,7 @@
       "citation_policy": "required",
       "llm_allowed": true,
       "human_review_required": false,
-      "notes": "Strong-evidence FAQ — eligible for LLM polish if other gates pass.",
+      "notes": "Strong-evidence FAQ \u2014 eligible for LLM polish if other gates pass.",
       "tags": []
     },
     {
@@ -2361,7 +2361,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -2410,7 +2410,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": true,
-      "notes": "Weak evidence — escalate or low confidence.",
+      "notes": "Weak evidence \u2014 escalate or low confidence.",
       "tags": [
         "response_quality",
         "source_attribution"
@@ -2459,7 +2459,7 @@
       "expected_action_names": [
         "verify_identity"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "Must verify before destructive refund.",
@@ -2524,7 +2524,7 @@
       "citation_policy": "required",
       "llm_allowed": true,
       "human_review_required": false,
-      "notes": "Strong-evidence FAQ — eligible for LLM polish if other gates pass.",
+      "notes": "Strong-evidence FAQ \u2014 eligible for LLM polish if other gates pass.",
       "tags": []
     },
     {
@@ -2539,7 +2539,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": false,
-      "notes": "Malformed or noisy input — agent must not crash.",
+      "notes": "Malformed or noisy input \u2014 agent must not crash.",
       "tags": []
     },
     {
@@ -2638,7 +2638,7 @@
       "expected_action_names": [
         "escalate_to_human"
       ],
-      "citation_policy": "empty",
+      "citation_policy": "allowed",
       "llm_allowed": false,
       "human_review_required": true,
       "notes": "",
@@ -2704,7 +2704,7 @@
       "citation_policy": "empty",
       "llm_allowed": false,
       "human_review_required": true,
-      "notes": "Compound safe + risky — escalate risky part.",
+      "notes": "Compound safe + risky \u2014 escalate risky part.",
       "tags": [
         "response_quality",
         "escalation_tool",

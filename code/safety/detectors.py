@@ -66,7 +66,8 @@ _INJECTION_PATTERNS: tuple[tuple[str, re.Pattern[str]], ...] = (
         "prompt_injection:corpus_embedded_override",
         re.compile(
             r"```\s*system\b|SYSTEM\s+OVERRIDE|you\s+are\s+unrestricted|"
-            r"comply\s+with\s+(?:user\s+)?orders|maintenance\s+mode\s+disabled",
+            r"comply\s+with\s+(?:user\s+)?orders|maintenance\s+mode\s+disabled|"
+            r"<!--\s*ignore\s+safety|ignore\s+safety\s*-->",
             re.IGNORECASE,
         ),
     ),
