@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from paths import DEFAULT_INPUT_CSV, DEFAULT_OUTPUT_CSV, OUTPUT_COLUMNS, REPO_ROOT
 from safety.pii_leak import find_pii_leaks, input_text_for_row
+from safety import classify_ticket
 from schemas.tool_schema import load_tool_specs, validate_actions
 
 VALID_STATUS = {"replied", "escalated"}
@@ -170,8 +171,43 @@ def check_source_documents(report: ValidationReport, rows: list[dict[str, str]])
             except ValueError:
                 report.add_error(f"Row {index}: source_documents path escapes repo: {doc_path}")
                 continue
+            # Rubric: citations must be under data/ (repo-relative).
+            try:
+                resolved.relative_to((REPO_ROOT / "data").resolve())
+            except ValueError:
+                report.add_error(f"Row {index}: source_documents must be under data/: {doc_path}")
+                continue
             if not resolved.is_file():
                 report.add_error(f"Row {index}: source_documents file not found: {doc_path}")
+
+
+def check_source_documents_policy(
+    report: ValidationReport,
+    input_rows: list[dict[str, str]],
+    output_rows: list[dict[str, str]],
+) -> None:
+    """
+    Enforce rubric policy for citations on invalid/adversarial rows.
+
+    Rule (strict, conservative):
+    - If the row is adversarial OR output request_type is invalid, citations must be empty.
+    """
+    if len(input_rows) != len(output_rows):
+        return
+
+    for index, (in_row, out_row) in enumerate(zip(input_rows, output_rows), start=1):
+        normalized = _normalize_input_row(in_row)
+        ticket_text = input_text_for_row(normalized["issue"], normalized["subject"])
+        assessment = classify_ticket(ticket_text)
+
+        request_type = (out_row.get("request_type") or "").strip().lower()
+        raw_sources = (out_row.get("source_documents") or "").strip()
+
+        if assessment.is_adversarial or request_type == "invalid":
+            if raw_sources:
+                report.add_error(
+                    f"Row {index}: source_documents must be empty for adversarial/invalid rows"
+                )
 
 
 def check_pii_echo(
@@ -260,6 +296,7 @@ def validate(
     check_enums(report, output_rows)
     check_actions(report, output_rows, specs)
     check_source_documents(report, output_rows)
+    check_source_documents_policy(report, input_rows, output_rows)
     check_input_fields_preserved(report, input_rows, output_rows)
     check_pii_echo(report, input_rows, output_rows)
 

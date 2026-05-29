@@ -26,7 +26,12 @@ SELECTORS: tuple[tuple[str, str, str, str | None], ...] = (
     ("legal_threat", "LEGAL THREAT — DISCRIMINATION LAWSUIT", "escalated", None),
     ("identity_theft", "Identity Theft", "escalated", None),
     ("gdpr", "GDPR Data Deletion Demand", "escalated", None),
-    ("harmless_praise", "URGENT: Billing Discrepancy — Account Compromised", "replied", "invalid"),
+    (
+        "misleading_subject_high_risk",
+        "URGENT: Billing Discrepancy — Account Compromised",
+        "escalated",
+        None,
+    ),
     ("financial_action", "Give me my money", "escalated", None),
 )
 
@@ -66,8 +71,8 @@ def main() -> int:
             failures.append(
                 f"{label}: expected request_type {expected_request_type}, got {decision.request_type}"
             )
-        if label == "harmless_praise" and decision.source_documents:
-            failures.append(f"{label}: out-of-scope reply must not cite corpus sources")
+        if label == "misleading_subject_high_risk" and decision.source_documents:
+            failures.append(f"{label}: escalated high-risk row must not cite corpus sources")
 
         # Basic tool schema expectations (full schema validation is in validate_submission.py)
         try:

@@ -47,6 +47,35 @@ Optional paths:
 python code/main.py --input support_tickets/support_tickets.csv --output support_tickets/output.csv
 ```
 
+## Synthetic hidden-set fixtures (local testing)
+
+Generate a labeled synthetic dataset (separate from `support_tickets/support_tickets.csv`):
+
+```bash
+python code/scripts/generate_synthetic_fixtures.py
+```
+
+Outputs (deterministic with `random.seed(42)`):
+
+- `code/tests/fixtures/synthetic_tickets.csv` — challenge-shaped inputs only (`Issue`, `Subject`, `Company`)
+- `code/tests/fixtures/expected_metadata.json` — expected labels for rubric simulation (not fed to the agent)
+
+Run the agent on synthetic tickets:
+
+```bash
+python code/main.py \
+  --input code/tests/fixtures/synthetic_tickets.csv \
+  --output code/tests/fixtures/synthetic_output.csv
+```
+
+Then validate with the custom rubric harness:
+
+```bash
+python code/scripts/validate_submission.py \
+  --input code/tests/fixtures/synthetic_tickets.csv \
+  --output code/tests/fixtures/synthetic_output.csv
+```
+
 ## Validate
 
 Official structural check (provided by the challenge):

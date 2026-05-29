@@ -29,6 +29,11 @@ _HIGH_SIGNALS = frozenset(
         "risk:security_vulnerability",
         "risk:fraud",
         "encoding:base64_instruction_payload",
+        "encoding:url_or_spaced_override",
+        "encoding:rot13_override",
+        "prompt_injection:multilingual_override",
+        "exfiltration:internal_tools_phrase",
+        "exfiltration:debug_or_internal_state",
     }
 )
 
