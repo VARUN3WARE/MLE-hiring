@@ -47,7 +47,7 @@ def compose_reply(*, retrieval: RetrievalResult, assessment: SafetyAssessment) -
     """
     sources = (
         source_document_paths(retrieval, exclude_hubs=True)
-        if retrieval.overall_grade in ("strong", "weak")
+        if retrieval.overall_grade in ("strong", "weak", "conflicting")
         else ""
     )
     snippet_lines: list[str] = []
@@ -94,10 +94,7 @@ def compose_escalation(
     has_tool_actions: bool = True,
     missing_prereqs: bool = False,
 ) -> ComposedResponse:
-    sources = ""
-    if retrieval is not None and retrieval.overall_grade in ("strong", "weak"):
-        sources = source_document_paths(retrieval)
-
+    # Escalations never cite corpus documents — keeps attribution policy strict.
     response = (
         "Thank you for reaching out. I’m escalating this to a support specialist for review. "
         "For safety and privacy reasons, we may need additional verification before taking any account-level actions."
@@ -111,9 +108,6 @@ def compose_escalation(
     if assessment.pii_detected:
         response += " Please avoid sharing sensitive personal information in chat. If verification is needed, support will guide you securely."
 
-    if sources:
-        response = f"{response}\n\nSources: {sources}"
-
     justification = f"Escalated. {reason}".strip()
     confidence = calibrate_confidence(
         status="escalated",
@@ -126,7 +120,7 @@ def compose_escalation(
         response=response,
         justification=justification,
         confidence_score=_fmt_conf(confidence),
-        source_documents=sources,
+        source_documents="",
     )
 
 

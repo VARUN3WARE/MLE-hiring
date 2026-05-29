@@ -9,12 +9,18 @@ HUB_PAGE_NAMES = frozenset({"index.md", "support.md"})
 
 # Imperative account / billing actions that require human or verified tooling.
 _ACCOUNT_ACTION_PHRASES: tuple[str, ...] = (
-    "refund me",
     "give me my money",
     "issue a refund",
     "reverse the charge",
+    "charge me back",
     "chargeback",
+    "never authorized",
+    "refund me",
+    "refund $",
+    "refund request",
     "cancel my subscription",
+    "cancel subscription",
+    "downgrade to free",
     "upgrade my plan",
     "downgrade my plan",
     "ban the seller",
@@ -56,6 +62,19 @@ _OUT_OF_SCOPE_PHRASES: tuple[str, ...] = (
     "links only",
 )
 
+_OOS_PATTERNS: tuple[str, ...] = (
+    "what is the weather",
+    "weather in ",
+    "python homework",
+    "write a python",
+    "who won the",
+    "cricket match",
+    "recommend a restaurant",
+    "good restaurant near",
+    "stock tip",
+    "investment advice",
+)
+
 _INVESTMENT_OUT_OF_SCOPE = re.compile(
     r"\b(?:investment advice|investment advice needed|should i buy|stock tip|financial advice|crypto)\b",
     re.IGNORECASE,
@@ -80,6 +99,9 @@ def is_harmless_out_of_scope(text: str) -> bool:
         return True
 
     if any(phrase in low for phrase in _OUT_OF_SCOPE_PHRASES):
+        return True
+
+    if any(phrase in low for phrase in _OOS_PATTERNS):
         return True
 
     # Mostly URLs with little user question text.

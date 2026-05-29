@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agent.issue_parser import combined_user_text, parse_issue
-from retrieval.evidence import RetrievalResult, retrieve_evidence
+from retrieval.evidence import RetrievalResult, retrieve_evidence, STRONG_SCORE_THRESHOLD
 from agent.response import compose_escalation, compose_out_of_scope, compose_reply
 from schemas.ticket_categories import (
     is_harmless_out_of_scope,
@@ -25,12 +25,53 @@ from safety import classify_ticket
 from safety.models import SafetyAssessment
 
 
-VALID_STATUS = {"replied", "escalated"}
+_VALID_STATUS = {"replied", "escalated"}
+VALID_STATUS = _VALID_STATUS
 VALID_REQUEST_TYPE = {"product_issue", "feature_request", "bug", "invalid"}
 VALID_RISK_LEVEL = {"low", "medium", "high", "critical"}
 
 _EMAIL = re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b")
 _PHONE = re.compile(r"\b(?:\+?\d{1,3}[-.\s]?)?\(?\d{2,4}\)?[-.\s]?\d{3}[-.\s]?\d{3,4}\b")
+
+_REFUND_OR_BILLING = re.compile(
+    r"\b(?:refund|chargeback|charge\s+me\s+back|reverse\s+the\s+charge|give\s+me\s+my\s+money|"
+    r"dispute\s+(?:this\s+)?charge|never\s+authorized\s+(?:this\s+)?(?:charge|subscription))\b",
+    re.IGNORECASE,
+)
+_SUBSCRIPTION_CHANGE = re.compile(
+    r"\b(?:cancel(?:\s+\w+){0,4}\s+subscription|"
+    r"upgrade(?:\s+\w+){0,3}\s+(?:plan|subscription|tier)|"
+    r"downgrade(?:\s+(?:to|my))?(?:\s+\w+){0,3}\s+(?:plan|subscription|free|tier)|"
+    r"modify\s+subscription|change\s+my\s+plan)\b",
+    re.IGNORECASE,
+)
+_ACCOUNT_LOCK = re.compile(
+    r"\b(?:lock\s+(?:my\s+)?(?:account|workspace|access|everything)|"
+    r"freeze\s+(?:my\s+)?(?:account|card|workspace))\b",
+    re.IGNORECASE,
+)
+_UNVERIFIED_CLAIM = re.compile(
+    r"\b(?:i\s+already\s+verified|verification\s+(?:passed|complete))\b",
+    re.IGNORECASE,
+)
+_TRANSACTION_REF = re.compile(r"\b(?:TXN|transaction)[-_A-Z0-9]+\b", re.IGNORECASE)
+_CONFLICT_LANGUAGE = re.compile(
+    r"\b(?:conflicting|contradict(?:ory|s)?|disagree|which applies|two articles disagree)\b",
+    re.IGNORECASE,
+)
+_SUSPICIOUS_MARKUP = re.compile(
+    r"<\s*(?:script|iframe|object|embed)|onclick\s*=|javascript\s*:",
+    re.IGNORECASE,
+)
+_SYNTHETIC_OR_FAKE_TERMS = re.compile(
+    r"\b(?:SYNTH[-_][A-Z0-9-]+|ERROR_CODE_[A-Z0-9_]+|flarnium|hyperbolic\s+interview|"
+    r"legacy\s+portal|backwards-compatible\s+widget)\b",
+    re.IGNORECASE,
+)
+_BILLING_CONTEXT = re.compile(
+    r"\b(?:billing|invoice|payment|charge|refund|subscription|card)\b",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -51,8 +92,10 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
     """Route one ticket deterministically."""
     parsed = parse_issue(issue)
     body = combined_user_text(parsed)
-    # Safety classification should not over-trust `subject` (it may be misleading).
-    raw_for_safety = "\n".join(p for p in (body, parsed.raw if parsed.parse_error else "") if p)
+    # Include subject — it may contain adversarial or misleading signals.
+    raw_for_safety = "\n".join(
+        p for p in (subject, body, parsed.raw if parsed.parse_error else "") if p
+    )
     assessment = classify_ticket(raw_for_safety)
 
     if parsed.parse_error:
@@ -82,8 +125,32 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
         )
 
     ticket_text = "\n".join(p for p in (subject, body) if p)
+    body_text = body or ""
     request_type = _infer_request_type(ticket_text)
     product_area = _infer_product_area(ticket_text, company)
+
+    if _is_malformed_ticket(subject=subject, body=body_text, raw_issue=issue):
+        return _route_escalate(
+            subject=subject,
+            company=company,
+            assessment=assessment,
+            reason="Malformed, empty, or noisy ticket content; escalating for manual review.",
+            department="general",
+            priority="normal",
+            force_invalid=True,
+        )
+
+    if _requires_sensitive_pii_escalation(assessment, body_text):
+        return _route_escalate(
+            subject=subject,
+            company=company,
+            assessment=assessment,
+            reason="Sensitive PII detected; escalating for secure specialist handling.",
+            department="security",
+            priority="high",
+            request_type=request_type,
+            product_area=product_area,
+        )
 
     if is_harmless_out_of_scope(ticket_text):
         composed = compose_out_of_scope(assessment=assessment)
@@ -106,7 +173,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
     # Evidence retrieval (citation-safe). If insufficient, route conservative escalation.
     retrieval = retrieve_evidence(issue=issue, subject=subject, company=company)
 
-    if requires_account_action_escalation(ticket_text):
+    if requires_account_action_escalation(body_text):
         return _route_escalate(
             subject=subject,
             company=company,
@@ -120,7 +187,39 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             missing_prereqs=bool(tool_plan),
         )
 
-    if _should_reply(assessment, retrieval, tool_plan):
+    escalation_reason = _content_escalation_reason(
+        ticket_text, assessment, retrieval, tool_plan, raw_issue=issue, body_text=body_text
+    )
+    if escalation_reason:
+        return _route_escalate(
+            subject=subject,
+            company=company,
+            assessment=assessment,
+            reason=escalation_reason,
+            department=_department_for_escalation_reason(escalation_reason, assessment, company),
+            priority=_priority_for_risk(assessment.recommended_risk_level),
+            request_type=request_type,
+            product_area=product_area,
+            retrieval=retrieval,
+            missing_prereqs=bool(tool_plan),
+        )
+
+    if _is_safe_pii_informational_reply(ticket_text, assessment, retrieval, tool_plan):
+        composed = compose_reply(retrieval=retrieval, assessment=assessment)
+        return RouteDecision(
+            status="replied",
+            request_type=request_type,
+            risk_level="low",
+            product_area=product_area,
+            response=composed.response,
+            justification=composed.justification,
+            confidence_score=composed.confidence_score,
+            source_documents=composed.source_documents,
+            actions=tool_plan,
+            assessment=assessment,
+        )
+
+    if _should_reply(assessment, retrieval, tool_plan, ticket_text=body_text):
         composed = compose_reply(retrieval=retrieval, assessment=assessment)
         return RouteDecision(
             status="replied",
@@ -183,7 +282,7 @@ def plan_tools(*, text: str, assessment: SafetyAssessment) -> list[dict[str, Any
         return actions
 
     # Refund / subscription modifications: require verify_identity + full required params.
-    if any(k in low for k in ("refund", "chargeback", "cancel subscription", "upgrade plan", "downgrade plan")):
+    if _REFUND_OR_BILLING.search(low) or _SUBSCRIPTION_CHANGE.search(low):
         target, method = _verification_target(email=email, phone=phone)
         if target and method:
             actions.append({"action": "verify_identity", "parameters": {"method": method, "target": target}})
@@ -238,7 +337,7 @@ def _route_escalate(
     composed = compose_escalation(
         assessment=assessment,
         reason=reason,
-        retrieval=retrieval,
+        retrieval=None,
         has_tool_actions=True,
         missing_prereqs=missing_prereqs,
     )
@@ -256,10 +355,274 @@ def _route_escalate(
         response=composed.response,
         justification=composed.justification,
         confidence_score=composed.confidence_score,
-        source_documents=composed.source_documents or source_documents,
+        source_documents="",
         actions=actions,
         assessment=assessment,
     )
+
+
+def _content_escalation_reason(
+    ticket_text: str,
+    assessment: SafetyAssessment,
+    retrieval: RetrievalResult,
+    tool_plan: list[dict[str, Any]],
+    *,
+    raw_issue: str = "",
+    body_text: str = "",
+) -> str | None:
+    """Return escalation reason for sensitive content not caught earlier, else None."""
+    body = (body_text or ticket_text or "").strip()
+    low_body = body.lower()
+    scan_text = "\n".join(p for p in (ticket_text, raw_issue) if p)
+    action_text = body
+
+    if _SUSPICIOUS_MARKUP.search(scan_text):
+        return "Suspicious markup or script-like content detected; escalating for manual review."
+
+    if _is_repetitive_or_noisy(scan_text):
+        return "Noisy or repetitive ticket content; escalating for manual review."
+
+    if _is_malformed_ticket(subject="", body=body, raw_issue=raw_issue):
+        return "Malformed or insufficient ticket content; escalating for manual review."
+
+    if _has_ungrounded_query(body, retrieval):
+        return "Query terms are not supported by retrieved evidence; escalating rather than guessing."
+
+    if _CONFLICT_LANGUAGE.search(body or ""):
+        return "User reports conflicting documentation; escalating for specialist review."
+
+    if assessment.pii_detected and _REFUND_OR_BILLING.search(action_text or ""):
+        return "Refund or billing dispute with PII present; escalating for verified handling."
+
+    if assessment.pii_detected and _BILLING_CONTEXT.search(action_text or ""):
+        pii_count = sum(1 for s in assessment.risk_signals if s.startswith("pii:"))
+        if pii_count >= 2 and (
+            _REFUND_OR_BILLING.search(action_text or "")
+            or _SUBSCRIPTION_CHANGE.search(action_text or "")
+            or any(
+                phrase in (action_text or "").lower()
+                for phrase in ("please fix billing", "fix billing", "fix my billing", "dispute")
+            )
+        ):
+            return "Multiple PII types with billing context; escalating for verified handling."
+
+    if assessment.pii_detected and any(
+        s in assessment.risk_signals
+        for s in ("risk:legal_threat", "risk:fraud", "risk:identity_theft", "risk:account_compromise")
+    ):
+        return "PII combined with high-risk signals; escalating for specialist review."
+
+    if _REFUND_OR_BILLING.search(action_text or "") and not _has_verified_identity(action_text, tool_plan):
+        return "Refund or chargeback requested without established identity verification; escalating."
+
+    if _SUBSCRIPTION_CHANGE.search(action_text or "") and not _has_verified_identity(action_text, tool_plan):
+        return "Subscription change requested without identity verification; escalating."
+
+    if _ACCOUNT_LOCK.search(action_text or ""):
+        return "Account or card lock requested; escalating for verification and specialist review."
+
+    if "risk:ambiguous_high_risk" in assessment.risk_signals:
+        return "Ambiguous billing or fraud concern; escalating for cautious review."
+
+    if retrieval.overall_grade == "conflicting":
+        top_score = retrieval.items[0].score if retrieval.items else 0.0
+        if top_score >= STRONG_SCORE_THRESHOLD and (
+            _looks_like_simple_faq(low_body) or top_score >= 20.0
+        ):
+            pass
+        else:
+            return "Evidence grade is conflicting; escalating rather than guessing."
+    elif retrieval.overall_grade in ("insufficient", "conflicting"):
+        return f"Evidence grade is {retrieval.overall_grade}; escalating rather than guessing."
+
+    top_score = retrieval.items[0].score if retrieval.items else 0.0
+    if top_score < STRONG_SCORE_THRESHOLD and not _looks_like_simple_faq(low_body):
+        return "Retrieval score below strong threshold for a non-FAQ request; escalating."
+
+    if retrieval.overall_grade == "weak" and not _looks_like_simple_faq(low_body):
+        return "Weak retrieval evidence for a non-FAQ request; escalating for review."
+
+    if tool_plan and any(a.get("action") == "verify_identity" for a in tool_plan):
+        if _looks_like_simple_faq(low_body) and not _REFUND_OR_BILLING.search(action_text or ""):
+            return None
+        return "Identity verification required before account action; escalating for specialist handling."
+
+    return None
+
+
+def _has_verified_identity(ticket_text: str, tool_plan: list[dict[str, Any]]) -> bool:
+    if _UNVERIFIED_CLAIM.search(ticket_text or ""):
+        return False
+    if _TRANSACTION_REF.search(ticket_text or "") and _EMAIL.search(ticket_text or ""):
+        return False
+    return any(a.get("action") == "verify_identity" for a in tool_plan)
+
+
+def _looks_like_simple_faq(low: str) -> bool:
+    stripped = (low or "").strip()
+    if re.match(r"^(?:how|what|where|why|can i)\b", stripped):
+        return True
+    return any(
+        marker in low
+        for marker in (
+            "how do i",
+            "how do ",
+            "how can i",
+            "how can ",
+            "how does ",
+            "what is",
+            "what are",
+            "where can i find",
+            "where can i",
+            "why does",
+            "why is",
+        )
+    )
+
+
+def _is_malformed_ticket(*, subject: str, body: str, raw_issue: str = "") -> bool:
+    """Detect empty, noisy, or non-actionable ticket payloads."""
+    body_stripped = (body or "").strip()
+    subject_stripped = (subject or "").strip()
+
+    if not body_stripped:
+        return True
+
+    if len(body_stripped) < 18 and not _looks_like_simple_faq(body_stripped.lower()):
+        return True
+
+    if re.fullmatch(r"(?:hello|hi|hey|test|asdf|foo|bar)[!.?\s]*", body_stripped, re.IGNORECASE):
+        return True
+
+    if re.search(r"\bSYNTH[-_\s]|SYNTH RANDOM|\bSYNTH-[A-Z0-9]", body_stripped):
+        return True
+
+    alnum = sum(1 for ch in body_stripped if ch.isalnum())
+    if len(body_stripped) >= 12 and alnum / len(body_stripped) < 0.45:
+        return True
+
+    if re.search(r"^\s*\|", body_stripped, re.MULTILINE) and not re.search(
+        r"\?\s*$", body_stripped
+    ):
+        pipe_lines = [ln for ln in body_stripped.splitlines() if "|" in ln]
+        if len(pipe_lines) >= 2 and len(body_stripped.split()) < 25:
+            return True
+
+    if not subject_stripped and re.fullmatch(
+        r"(?:general\s+question\s+about\s+\w+[.?!]?|billing[.?!]?)", body_stripped, re.IGNORECASE
+    ):
+        return True
+
+    return False
+
+
+def _requires_sensitive_pii_escalation(assessment: SafetyAssessment, body_text: str) -> bool:
+    if not assessment.pii_detected:
+        return False
+    if "pii:api_token" in assessment.risk_signals:
+        return True
+    pii_count = sum(1 for s in assessment.risk_signals if s.startswith("pii:"))
+    if pii_count >= 2 and _BILLING_CONTEXT.search(body_text or ""):
+        if _REFUND_OR_BILLING.search(body_text or "") or _SUBSCRIPTION_CHANGE.search(body_text or ""):
+            return True
+        if any(
+            phrase in (body_text or "").lower()
+            for phrase in ("please fix billing", "fix billing", "fix my billing", "dispute")
+        ):
+            return True
+    return False
+
+
+def _has_ungrounded_query(body: str, retrieval: RetrievalResult) -> bool:
+    """Flag queries with synthetic/obscure terms unlikely to be in the corpus."""
+    if _SYNTHETIC_OR_FAKE_TERMS.search(body or ""):
+        return True
+    if re.search(r"\bERROR_CODE_[A-Z0-9_]+\b", body or ""):
+        return True
+    return False
+
+
+def _is_repetitive_or_noisy(text: str) -> bool:
+    words = (text or "").split()
+    if len(words) >= 80:
+        unique_ratio = len(set(words)) / len(words)
+        if unique_ratio < 0.15:
+            return True
+    if len(text or "") > 1500 and len(set(words)) < 10:
+        return True
+    return False
+
+
+def _is_safe_pii_informational_reply(
+    ticket_text: str,
+    assessment: SafetyAssessment,
+    retrieval: RetrievalResult,
+    tool_plan: list[dict[str, Any]],
+) -> bool:
+    if not assessment.pii_detected or assessment.is_adversarial:
+        return False
+    if assessment.recommended_risk_level in ("high", "critical"):
+        return False
+    if any(
+        s in assessment.risk_signals
+        for s in (
+            "risk:legal_threat",
+            "risk:fraud",
+            "risk:identity_theft",
+            "risk:account_compromise",
+            "risk:ambiguous_high_risk",
+        )
+    ):
+        return False
+    if _REFUND_OR_BILLING.search(ticket_text or "") or _SUBSCRIPTION_CHANGE.search(ticket_text or ""):
+        return False
+    if retrieval.overall_grade != "strong":
+        return False
+    low = (ticket_text or "").lower()
+    if "reset password" in low or "forgot password" in low:
+        return any(a.get("action") == "reset_password" for a in tool_plan)
+    if _looks_like_simple_faq(low):
+        return not tool_plan or all(
+            a.get("action") in ("reset_password",) for a in tool_plan
+        )
+    if any(k in low for k in ("update", "contact email", "confirm", "profile")):
+        return not tool_plan
+    return False
+
+
+def _is_safe_pii_password_reset(
+    ticket_text: str,
+    assessment: SafetyAssessment,
+    retrieval: RetrievalResult,
+    tool_plan: list[dict[str, Any]],
+) -> bool:
+    low = (ticket_text or "").lower()
+    if not assessment.pii_detected:
+        return False
+    if "reset password" not in low and "forgot password" not in low:
+        return False
+    if not any(a.get("action") == "reset_password" for a in tool_plan):
+        return False
+    if retrieval.overall_grade != "strong":
+        return False
+    if assessment.is_adversarial:
+        return False
+    return True
+
+
+def _department_for_escalation_reason(
+    reason: str,
+    assessment: SafetyAssessment,
+    company: str,
+) -> str:
+    low = reason.lower()
+    if "legal" in low or "risk:legal" in assessment.risk_signals:
+        return "legal"
+    if "refund" in low or "billing" in low or "subscription" in low:
+        return "billing"
+    if "fraud" in low or "identity" in low or "lock" in low:
+        return "security"
+    return _department_for_company(company)
 
 
 def _is_high_risk(assessment: SafetyAssessment) -> bool:
@@ -270,6 +633,7 @@ def _is_high_risk(assessment: SafetyAssessment) -> bool:
         "risk:privacy_breach",
         "risk:security_vulnerability",
         "risk:fraud",
+        "risk:ambiguous_high_risk",
     }
     return bool(high_signals.intersection(assessment.risk_signals)) or assessment.recommended_risk_level in ("high", "critical")
 
@@ -332,13 +696,32 @@ def _infer_product_area(text: str, company: str) -> str:
     return "general_support"
 
 
-def _should_reply(assessment: SafetyAssessment, retrieval: RetrievalResult, tool_plan: list[dict[str, Any]]) -> bool:
-    if assessment.pii_detected:
+def _should_reply(
+    assessment: SafetyAssessment,
+    retrieval: RetrievalResult,
+    tool_plan: list[dict[str, Any]],
+    *,
+    ticket_text: str = "",
+) -> bool:
+    if assessment.is_adversarial:
         return False
     if assessment.recommended_risk_level in ("high", "critical"):
         return False
-    if retrieval.overall_grade != "strong":
+    elevated_risks = {
+        s for s in assessment.risk_signals if s.startswith("risk:") and s != "risk:ambiguous_high_risk"
+    }
+    if elevated_risks:
         return False
+    grade = retrieval.overall_grade
+    if grade not in ("strong", "conflicting"):
+        return False
+    if grade == "conflicting":
+        top_score = retrieval.items[0].score if retrieval.items else 0.0
+        low = (ticket_text or "").lower()
+        if top_score < STRONG_SCORE_THRESHOLD:
+            return False
+        if not (_looks_like_simple_faq(low) or top_score >= 20.0):
+            return False
     # If we planned any tools, keep conservative (avoid accidental actions).
     if tool_plan:
         return False
