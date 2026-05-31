@@ -263,6 +263,28 @@ _BASE64_DECODE_HINTS = re.compile(
     r"(?:ignore|instruction|system\s+prompt|password|pwned|override|disregard)",
     re.IGNORECASE,
 )
+_SYSTEM_PROMPT_PHRASE = re.compile(r"\bsystem\s+prompt\b", re.IGNORECASE)
+_DEVELOPER_API_CONTEXT = re.compile(
+    r"\b(?:messages\s+api|anthropic\s+api|claude\s+api|api\s+request|"
+    r"sdk|developer|my\s+app|application|integrate|parameter|"
+    r"json\s+body|request\s+body|format(?:ting)?|"
+    r"how\s+do\s+i|how\s+to|code\s+example|sample\s+code|"
+    r"build(?:ing)?\s+(?:an?\s+)?(?:app|application))\b",
+    re.IGNORECASE,
+)
+_EXFIL_SYSTEM_PROMPT_INTENT = re.compile(
+    r"(?:share|show|print|reveal|output|display|dump|provide|tell\s+me)\s+"
+    r"(?:your\s+)?(?:full\s+)?(?:system\s+prompt|hidden\s+instructions?)|"
+    r"(?:your|hidden|full|internal)\s+system\s+prompt|"
+    r"system\s+prompt\s+(?:and|&)\s+(?:internal|hidden|rules?)",
+    re.IGNORECASE,
+)
+_SYSTEM_PROMPT_FALSE_POSITIVE_SIGNALS = frozenset(
+    {
+        "prompt_injection:system_override",
+        "prompt_injection:multilingual_override",
+    }
+)
 
 
 def _detect_base64_signals(text: str) -> list[str]:
@@ -304,6 +326,24 @@ def _normalize_for_detection(text: str) -> str:
     return cleaned
 
 
+def _is_safe_developer_system_prompt_reference(text: str) -> bool:
+    """
+    Allow 'system prompt' when it clearly refers to API/developer usage,
+    not exfiltration of this agent's hidden instructions.
+    """
+    if not _SYSTEM_PROMPT_PHRASE.search(text):
+        return False
+    if _EXFIL_SYSTEM_PROMPT_INTENT.search(text):
+        return False
+    return bool(_DEVELOPER_API_CONTEXT.search(text))
+
+
+def _filter_system_prompt_false_positives(text: str, signals: list[str]) -> list[str]:
+    if not _is_safe_developer_system_prompt_reference(text):
+        return signals
+    return [signal for signal in signals if signal not in _SYSTEM_PROMPT_FALSE_POSITIVE_SIGNALS]
+
+
 def detect_adversarial_signals(text: str) -> list[str]:
     """Signals indicating prompt injection or exfiltration attempts."""
     normalized = _normalize_for_detection(text)
@@ -335,7 +375,7 @@ def detect_adversarial_signals(text: str) -> list[str]:
         re.IGNORECASE,
     ):
         signals.append("exfiltration:internal_tools_phrase")
-    return signals
+    return _filter_system_prompt_false_positives(normalized, signals)
 
 
 def detect_risk_topic_signals(text: str) -> list[str]:
