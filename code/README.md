@@ -1,6 +1,6 @@
-# Support Triage Agent (Deterministic + Optional Gated LLM)
+# Support Triage Agent (Deterministic Core + Gated LLM Polisher)
 
-This submission is **deterministic by default** (no network calls) and produces `support_tickets/output.csv` from `support_tickets/support_tickets.csv`.
+This submission produces `support_tickets/output.csv` from `support_tickets/support_tickets.csv`. Routing, tool planning, and all decision fields are **always deterministic**; an optional LLM layer may polish reply wording when enabled.
 
 It includes:
 
@@ -28,29 +28,32 @@ pip install -r code/requirements.txt
 **Step 3 — Configure environment variables:**
 ```bash
 cp .env.example .env
-# Open .env and paste your OPENAI_API_KEY if you want the optional LLM polisher
+# Open .env and paste your OPENAI_API_KEY to enable the LLM polisher
 ```
 
 The `.env` file must be placed at the **repository root** (next to the `code/` folder), not inside `code/`. The agent discovers it automatically via `code/paths.py`.
 
 ## Run
 
-**Deterministic mode (default, no network calls, fully reproducible):**
+**Default run (LLM polisher ON when `OPENAI_API_KEY` is set in the environment or `.env`):**
 ```bash
 python code/main.py
 ```
 
-**With optional LLM polisher enabled:**
+If `OPENAI_API_KEY` is missing, the agent **automatically falls back** to deterministic responses (no network calls). If the key is present, eligible rows may call the API to polish reply wording only.
+
+**Force strict determinism (no LLM calls, fully reproducible):**
 ```bash
-USE_LLM_POLISHER=true python code/main.py
+USE_LLM_POLISHER=false python code/main.py
 ```
 
 Notes:
 
-- With `USE_LLM_POLISHER=false` (default), output is fully deterministic and performs **no network calls**.
+- The LLM polisher is **ON by default** when `USE_LLM_POLISHER` is unset. It runs only when `OPENAI_API_KEY` is available; otherwise every row uses the deterministic draft.
+- Set `USE_LLM_POLISHER=false` explicitly to force the polisher off regardless of API key.
 - No LLM call is made for ineligible rows (eligibility gate is conservative).
 - The LLM can only replace the **`response` text**. All routing/decision fields remain deterministic.
-- If the API key is missing, the API fails, times out, or validation fails, we **immediately fall back** to the deterministic response.
+- If the API fails, times out, or validation fails, we **immediately fall back** to the deterministic response.
 
 Optional custom paths:
 ```bash
@@ -173,7 +176,7 @@ python code/tests/test_llm_eligibility.py
 
 ## Reproducibility checklist
 
-- Deterministic run: `USE_LLM_POLISHER=false python code/main.py`
+- Force deterministic run: `USE_LLM_POLISHER=false python code/main.py`
 - Output path: `support_tickets/output.csv`
 - Validate structure: `python code/scripts/validate_output.py`
 - Validate submission locally: `python code/scripts/validate_submission.py`

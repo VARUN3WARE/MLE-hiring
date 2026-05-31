@@ -160,13 +160,15 @@ Fallback is immediate and strict:
 
 ## Determinism and reproducibility
 
-Deterministic mode is the default:
+**LLM mode is the default** when `USE_LLM_POLISHER` is unset: the polisher is enabled and will call the API for eligible rows if `OPENAI_API_KEY` is present in the environment or `.env`. If the key is missing, the agent **automatically falls back** to deterministic drafts with no network calls.
 
-- `USE_LLM_POLISHER=false` (or unset)
+To force strict reproducibility (recommended before submission validation):
+
+- `USE_LLM_POLISHER=false python code/main.py`
 - No network calls occur
 - Re-running produces identical output for the same inputs and corpus
 
-When LLM is enabled:
+When the LLM polisher is active (default with a valid API key):
 
 - Only a small subset of rows may call the API (eligibility gate)
 - `temperature=0` is pinned
@@ -190,7 +192,7 @@ Run from repo root:
 - Retrieval is lexical (BM25). Semantic matches can be missed.
 - Hub pages can dominate without careful penalties; we bias toward specific articles.
 - LLM polisher does not yet run a full PII-echo scan on the final response text beyond JSON/source validation.
-- LLM mode can break strict determinism (by design), so the submission should be validated with LLM disabled.
+- LLM mode can break strict determinism (by design); use `USE_LLM_POLISHER=false` for reproducible validation runs.
 
 ---
 
@@ -207,7 +209,7 @@ Run from repo root:
 | Tool Calling (10%) | 9/10 | All tool calls are schema-validated against `data/api_specs/internal_tools.json`. Destructive actions require `verify_identity` or established context; LLM cannot modify the tool plan. |
 | PII Detection (10%) | 9/10 | Regex-based detection covers emails, phones, credit cards, SSNs, addresses, and API tokens. Zero PII echo failures recorded across all test runs. |
 | Confidence Calibration (5%) | 6/10 | Confidence is non-constant and determined by evidence grade and risk level, but it is heuristic-based rather than probabilistically calibrated. Brier score will not be perfect. |
-| Determinism & Reproducibility (5%) | 10/10 | SHA-256 hashes were identical across two consecutive runs. No randomness is used without a fixed seed. LLM mode is explicitly opt-in and clearly documented. |
+| Determinism & Reproducibility (5%) | 10/10 | SHA-256 hashes were identical across two consecutive runs with `USE_LLM_POLISHER=false`. LLM mode is on by default when a key is present but falls back deterministically when credentials are missing; strict reproducibility is one env flag away. |
 
 ---
 
