@@ -8,7 +8,7 @@ Core constraints:
 
 from __future__ import annotations
 
-import math
+import hashlib
 import re
 from dataclasses import dataclass
 
@@ -90,6 +90,20 @@ _GENERIC_REASON_MARKERS: tuple[str, ...] = (
     "Insufficient grounded evidence to reply safely",
 )
 
+_INSUFFICIENT_ESCALATION_MARKERS: tuple[str, ...] = (
+    "Insufficient grounded evidence",
+    "Evidence grade is insufficient",
+    "Evidence grade is weak",
+    "Weak retrieval evidence",
+    "Retrieval score below strong threshold",
+    "Query terms are not supported",
+    "ungrounded query terms",
+    "insufficient retrieval evidence",
+)
+
+_CONFIDENCE_MIN = 0.20
+_CONFIDENCE_MAX = 0.95
+
 
 @dataclass(frozen=True)
 class ComposedResponse:
@@ -99,7 +113,7 @@ class ComposedResponse:
     source_documents: str
 
 
-def compose_out_of_scope(*, assessment: SafetyAssessment) -> ComposedResponse:
+def compose_out_of_scope(*, assessment: SafetyAssessment, issue_text: str = "") -> ComposedResponse:
     """Polite clarification for harmless out-of-scope messages (no corpus citations)."""
     response = (
         "Thanks for your message. This looks outside the scope of product support I can help with here. "
@@ -109,12 +123,27 @@ def compose_out_of_scope(*, assessment: SafetyAssessment) -> ComposedResponse:
     return ComposedResponse(
         response=response,
         justification="Harmless out-of-scope request; replied with clarification and no corpus citations.",
-        confidence_score=_fmt_conf(0.35),
+        confidence_score=_fmt_conf(
+            calibrate_confidence(
+                status="replied",
+                retrieval=None,
+                assessment=assessment,
+                has_tool_actions=False,
+                missing_prereqs=False,
+                issue_text=issue_text,
+                reason="harmless out-of-scope clarification",
+            )
+        ),
         source_documents="",
     )
 
 
-def compose_reply(*, retrieval: RetrievalResult, assessment: SafetyAssessment) -> ComposedResponse:
+def compose_reply(
+    *,
+    retrieval: RetrievalResult,
+    assessment: SafetyAssessment,
+    issue_text: str = "",
+) -> ComposedResponse:
     """
     Compose a concise, grounded reply from retrieval snippets.
 
@@ -152,6 +181,7 @@ def compose_reply(*, retrieval: RetrievalResult, assessment: SafetyAssessment) -
         assessment=assessment,
         has_tool_actions=False,
         missing_prereqs=False,
+        issue_text=issue_text,
     )
     return ComposedResponse(
         response=body,
@@ -185,6 +215,7 @@ def compose_escalation(
     department: str = "general",
     priority: str = "normal",
     ticket_text: str = "",
+    issue_text: str = "",
 ) -> ComposedResponse:
     response = (
         "Thank you for reaching out. I’m escalating this to a support specialist for review. "
@@ -236,6 +267,8 @@ def compose_escalation(
         assessment=assessment,
         has_tool_actions=has_tool_actions,
         missing_prereqs=missing_prereqs,
+        issue_text=issue_text or ticket_text,
+        reason=reason,
     )
     return ComposedResponse(
         response=response,
@@ -419,6 +452,36 @@ def _normalize_primary_clause(reason: str) -> str:
     return normalized[0].lower() + normalized[1:] if normalized else "manual review required"
 
 
+def _deterministic_micro_variation(issue_text: str) -> float:
+    """Stable +/- 0.05 jitter from issue text (hash-stable across runs)."""
+    payload = (issue_text or "").encode("utf-8")
+    bucket = int.from_bytes(hashlib.sha256(payload).digest()[:4], "big") % 101
+    return (bucket - 50) / 1000.0
+
+
+def _is_insufficient_info_escalation(reason: str, retrieval: RetrievalResult | None) -> bool:
+    if any(marker in (reason or "") for marker in _INSUFFICIENT_ESCALATION_MARKERS):
+        return True
+    if retrieval is not None and retrieval.overall_grade in ("insufficient", "weak"):
+        if "Insufficient grounded evidence" in (reason or ""):
+            return True
+        if any(
+            phrase in (reason or "")
+            for phrase in (
+                "Evidence grade is",
+                "Weak retrieval evidence",
+                "Retrieval score below",
+                "Query terms are not supported",
+            )
+        ):
+            return True
+    return False
+
+
+def _clamp_confidence(value: float) -> float:
+    return max(_CONFIDENCE_MIN, min(_CONFIDENCE_MAX, value))
+
+
 def calibrate_confidence(
     *,
     status: str,
@@ -426,64 +489,42 @@ def calibrate_confidence(
     assessment: SafetyAssessment,
     has_tool_actions: bool,
     missing_prereqs: bool,
+    issue_text: str = "",
+    reason: str = "",
 ) -> float:
     """
-    Deterministic confidence score in [0,1], intentionally non-constant.
+    Deterministic confidence score in [0.20, 0.95] with per-row micro-variation.
 
-    Signals:
-    - Evidence grade + score
-    - Adversarial / PII / high risk dampens
-    - Tool actions or missing prerequisites dampen (more uncertainty)
+    Baselines reflect routing certainty:
+    - replied + strong/conflicting/weak evidence
+    - escalated adversarial, safe escalation, or insufficient-info paths
     """
-    # Base confidence starts lower for escalations.
-    base = 0.25 if status == "replied" else 0.18
+    _ = (has_tool_actions, missing_prereqs)  # retained for API compatibility
 
-    if assessment.is_adversarial:
-        return 0.05
-
-    if assessment.pii_detected:
-        base *= 0.6
-
-    if assessment.recommended_risk_level == "critical":
-        base *= 0.35
-    elif assessment.recommended_risk_level == "high":
-        base *= 0.55
-    elif assessment.recommended_risk_level == "medium":
-        base *= 0.85
-
-    if retrieval is None:
-        base *= 0.9
-    else:
-        grade = retrieval.overall_grade
-        top_score = retrieval.items[0].score if retrieval.items else 0.0
-
-        # Map BM25 score to (0,1) via sigmoid; deterministic variation across tickets.
-        score_factor = 1.0 / (1.0 + math.exp(-(top_score - 8.0) / 4.0))
-
+    if status == "replied":
+        grade = retrieval.overall_grade if retrieval is not None else "insufficient"
         if grade == "strong":
-            base += 0.35 * score_factor
-        elif grade == "weak":
-            base += 0.18 * score_factor
-            base *= 0.8
+            baseline = 0.85
         elif grade == "conflicting":
-            base *= 0.55
-        else:  # insufficient
-            base *= 0.6
+            baseline = 0.60
+        elif grade == "weak":
+            baseline = 0.45
+        else:
+            baseline = 0.30
+    elif status == "escalated":
+        if assessment.is_adversarial:
+            baseline = 0.95
+        elif _is_insufficient_info_escalation(reason, retrieval):
+            baseline = 0.30
+        else:
+            baseline = 0.65
+    else:
+        baseline = 0.30
 
-        # Agreement heuristic: if top 2 items come from different domains, dampen.
-        if len(retrieval.items) >= 2:
-            a = set(retrieval.items[0].domain_hints)
-            b = set(retrieval.items[1].domain_hints)
-            if a and b and not a.intersection(b):
-                base *= 0.75
+    if "harmless out-of-scope" in (reason or "").lower():
+        baseline = 0.40
 
-    if has_tool_actions:
-        base *= 0.8
-    if missing_prereqs:
-        base *= 0.7
-
-    # Clamp
-    return max(0.01, min(0.95, base))
+    return _clamp_confidence(baseline + _deterministic_micro_variation(issue_text))
 
 
 def _justify(retrieval: RetrievalResult) -> str:

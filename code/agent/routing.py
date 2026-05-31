@@ -109,7 +109,11 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
 
     if parsed.parse_error:
         return _route_invalid_issue(
-            subject=subject, company=company, assessment=assessment, ticket_text=ticket_text
+            subject=subject,
+            company=company,
+            assessment=assessment,
+            ticket_text=ticket_text,
+            issue_text=issue,
         )
 
     # High-risk topics: always escalate.
@@ -122,6 +126,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             department=_department_for_signals(assessment),
             priority=_priority_for_risk(assessment.recommended_risk_level),
             ticket_text=ticket_text,
+            issue_text=issue,
         )
 
     # Adversarial / exfiltration: escalate security.
@@ -135,6 +140,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             priority="high",
             force_invalid=True,
             ticket_text=ticket_text,
+            issue_text=issue,
         )
 
     body_text = body or ""
@@ -151,6 +157,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             priority="normal",
             force_invalid=True,
             ticket_text=ticket_text,
+            issue_text=issue,
         )
 
     if _requires_sensitive_pii_escalation(assessment, body_text):
@@ -164,10 +171,11 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             request_type=request_type,
             product_area=product_area,
             ticket_text=ticket_text,
+            issue_text=issue,
         )
 
     if is_harmless_out_of_scope(ticket_text):
-        composed = compose_out_of_scope(assessment=assessment)
+        composed = compose_out_of_scope(assessment=assessment, issue_text=issue)
         return RouteDecision(
             status="replied",
             request_type="invalid",
@@ -203,6 +211,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             retrieval=retrieval,
             force_invalid=True,
             ticket_text=ticket_text,
+            issue_text=issue,
         )
 
     if requires_account_action_escalation(body_text):
@@ -218,6 +227,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             retrieval=retrieval,
             missing_prereqs=bool(tool_plan),
             ticket_text=ticket_text,
+            issue_text=issue,
         )
 
     escalation_reason = _content_escalation_reason(
@@ -237,10 +247,11 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
             missing_prereqs=bool(tool_plan),
             force_invalid=_content_escalation_force_invalid(escalation_reason),
             ticket_text=ticket_text,
+            issue_text=issue,
         )
 
     if _is_safe_pii_informational_reply(ticket_text, assessment, retrieval, tool_plan):
-        composed = compose_reply(retrieval=retrieval, assessment=assessment)
+        composed = compose_reply(retrieval=retrieval, assessment=assessment, issue_text=issue)
         return RouteDecision(
             status="replied",
             request_type=request_type,
@@ -255,7 +266,7 @@ def route_ticket(*, issue: str, subject: str, company: str) -> RouteDecision:
         )
 
     if _should_reply(assessment, retrieval, tool_plan, ticket_text=body_text):
-        composed = compose_reply(retrieval=retrieval, assessment=assessment)
+        composed = compose_reply(retrieval=retrieval, assessment=assessment, issue_text=issue)
         return RouteDecision(
             status="replied",
             request_type=request_type,
@@ -329,7 +340,7 @@ def plan_tools(*, text: str, assessment: SafetyAssessment) -> list[dict[str, Any
 
 
 def _route_invalid_issue(
-    *, subject: str, company: str, assessment: SafetyAssessment, ticket_text: str = ""
+    *, subject: str, company: str, assessment: SafetyAssessment, ticket_text: str = "", issue_text: str = ""
 ) -> RouteDecision:
     return _route_escalate(
         subject=subject,
@@ -341,6 +352,7 @@ def _route_invalid_issue(
         force_invalid=True,
         retrieval=None,
         ticket_text=ticket_text or subject,
+        issue_text=issue_text or ticket_text or subject,
     )
 
 
@@ -359,6 +371,7 @@ def _route_escalate(
     retrieval: RetrievalResult | None = None,
     missing_prereqs: bool = False,
     ticket_text: str = "",
+    issue_text: str = "",
 ) -> RouteDecision:
     if force_invalid:
         req_type = "invalid"
@@ -384,6 +397,7 @@ def _route_escalate(
         department=department,
         priority=priority,
         ticket_text=ticket_text or subject,
+        issue_text=issue_text or ticket_text or subject,
     )
     actions = [
         {
