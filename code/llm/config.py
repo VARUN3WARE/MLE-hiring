@@ -63,10 +63,14 @@ def load_llm_config(*, load_env_file: bool = True, force_reload: bool = False) -
     if load_env_file:
         load_dotenv_file()
 
-    enabled = _parse_bool(os.environ.get("USE_LLM_POLISHER"))
-    if not enabled:
-        # Back-compat with earlier .env.example name.
-        enabled = _parse_bool(os.environ.get("LLM_ENABLED"))
+    use_llm_raw = os.environ.get("USE_LLM_POLISHER")
+    if use_llm_raw is not None:
+        enabled = _parse_bool(use_llm_raw, default=False)
+    elif os.environ.get("LLM_ENABLED") is not None:
+        # Back-compat with earlier .env.example name when USE_LLM_POLISHER is unset.
+        enabled = _parse_bool(os.environ.get("LLM_ENABLED"), default=True)
+    else:
+        enabled = True
 
     max_polish_raw = os.environ.get("LLM_MAX_POLISH", "").strip()
     max_polish = int(max_polish_raw) if max_polish_raw.isdigit() else None

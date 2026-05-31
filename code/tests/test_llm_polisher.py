@@ -280,6 +280,12 @@ def test_env_flag_alias() -> None:
     with patch.dict(os.environ, {"USE_LLM_POLISHER": "false", "LLM_ENABLED": "true"}, clear=False):
         reset_llm_config_cache()
         cfg = load_llm_config(force_reload=True)
+    assert cfg.enabled is False
+
+    reset_llm_config_cache()
+    with patch.dict(os.environ, {"LLM_ENABLED": "true"}, clear=True):
+        reset_llm_config_cache()
+        cfg = load_llm_config(force_reload=True, load_env_file=False)
     assert cfg.enabled is True
 
 
